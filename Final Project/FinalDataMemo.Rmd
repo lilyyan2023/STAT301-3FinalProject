@@ -1,0 +1,55 @@
+---
+title: "FinalProjectDataMemo"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE}
+library(tidyverse)
+library(skimr)
+```
+
+
+## Proposed timeline
+Since the dataset has been already available to us, we can have our dataset loaded into R today. We expect to start our analysis from the week May 24th. 
+
+## Overview of the dataset
+This dataset documents patient information that had a stroke or not. We simply download it from Kaggle (https://www.kaggle.com/fedesoriano/stroke-prediction-dataset). The dataset includes 5110 observations and 12 variables. 
+
+```{r}
+stroke <- read_csv("healthcare-dataset-stroke-data.csv")
+skim_without_charts(stroke)
+```
+There are 6 character variables and 6 numeric variables. There are no missingness. Since `hyperextension`, `heart_disease`, `stroke` have numbers related to different patient conditions, we can change these numeric variables to factor variables. `gender`, `ever_married`, `work_type`, `Residence_type`, `smoking_status` have specific categories related to different character, we can change these from character variable to factor variable. `bmi` is a character variable, but it, in fact, has a continuous numerical value, so we can change it to numeric variable. We can also take `id` out since it is not significant for the model to predict whether a patient will have stroke or not. We don't need to join other sources of data together.
+
+## Potential Research Questions
+Our research question is to determine whether a patient will have stroke based on input parameters like gender, age, related diseases, body mass index (bmi), and smoking status. The research question is predictive. The question is best answered by a classification approach. The response variable is `stroke` (whether the patient had stroke), and it is categorical. Variables useful in modeling the response are `gender`, `age`, `hypertension`, `heart_disease`, `ever_married`, `work_type`, `Residence_type`, `avg_glucose_level`, `bmi`, and `smoking_status`.
+
+## Potential Difficulties
+One challenge in preprocessing is to make sure that the variable types are correct. In the original dataset, many categorical variables have levels 0 and 1. Thus, when loaded, they will be automatically recognized as numeric variables. To make sure the types are correct, we need to turn these categorical variables into factors. 
+
+Another main challenge is class imbalance in both the predictors and the outcome variable. For the outcome variable `stroke`, there are 4861 observations with value `no` and only 249 observations with value `yes`. In this case, the “accuracy” metric will be misleading. We plan to deal with the imbalance using techniques in the resampling process. We currently have two potential solutions: Under-sampling and over-sampling. Searching online, we noted that over-sampling is to duplicate random records from the minority class, which can cause overfishing, while under-sampling involves removing random records from the majority class, which can cause loss of information. We might need to take careful consideration about the trade-off between the two methods and discuss with the instructors to decide which method to use. In addition, there are serious class imbalance in the some of the potential predictors. For example, for variable `hypertension`(whether or not the person have hypertension) 4612 observations have value `0` (no) and 498 observations have value `1` (yes). Similar situations happen for variable `heart_disease` (whether or not the person have heart disease). 
+
+Moreover, the numeric predictor `avg_glucose_level` is right-skewed. This problem can be solved using stepping function when creating the recipe.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
