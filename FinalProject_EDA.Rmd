@@ -18,6 +18,7 @@ library(tidymodels)
 library(skimr)
 library(naniar)
 library(kableExtra)
+library(corrplot)
 set.seed(123)
 ```
 
@@ -119,15 +120,118 @@ As shown, `bmi` is the only variable with missing values and its percentage of m
 <br>
 
 ## Essential Findings
+
+### Outcome variable
+
+We first performed a univariate investigation of the response variable `stroke`. The barchart below provides an overview on the distribution of `stroke` in the training set: 
+```{r outcome-var-plot, fig.height= 7, fig.width=7}
+
+# plot
+stroke_train %>%
+  ggplot(aes(stroke, fill = stroke)) + 
+  geom_bar(show.legend = FALSE) + 
+  labs(
+    x = "Stroke", 
+    y = "Number of Observations", 
+    title = "Distribution of Response Variable"
+  ) + 
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25
+  )
+```
+<br>
+
+As shown above, even though we stratified by the outcome variable `stroke` when performing data splitting, there is still severe class imbalance in the outcome variable. There are 180 observations in level `Yes` and 3397 observations in level `No`. Depending on the plans for resampling, we might need to consider using over-sampling or under-sampling to avoid errors in the resampling and cross-validation process. Further decisions will be made after consulting the professors and TAs. 
+<br>
+
+### Numeric Predictors
+
+#### Correlation among Predictors
+
+We used a correlation plot to explore the correlation among numeric predictors. Since the degree of missingness is very low for `bmi` we temporarily dropped the `NA` in plotting to avoid errors.  
+```{r, fig.height= 8, fig.width=8}
+# correlation plot
+stroke_train %>% 
+  select(age, avg_glucose_level, bmi) %>% 
+  
+  drop_na() %>% 
+  # compute correlation matrix
+  cor() %>% 
+  # visualize
+  corrplot(type = "upper", 
+           title = "Correlations between Numeric Variables", 
+           mar = c(0, 0, 1, 0))
+```
+<br>
+
+As shown, there is no near-perfect collinearity between any pair of number predictors. All three variables are positively related to each other. 
+
+#### `age` predictor
+
+In common knowledge, age is often closely related to one's risk for stroke. Also, knowing the distribution of variable `age` in this dataset can help us understand the age range of population for which the result of this project is applicable. Thus, we plotted the distribution of `age` in the training set: 
 ```{r}
-ggplot(stroke_train, aes(x = stroke, fill = gender)) +
-   geom_bar(position = "fill") +
-   labs(
+# distribution of age
+ggplot(stroke_train, aes(age)) + 
+  geom_histogram(binwidth = 1) + 
+  labs(
+    x = "age", 
+    y = "number of observations", 
+    title = "Distribution of `age` in the Training Set"
+  )
+```
+<br>
+
+As shown, the distribution of `age` is about normal. Also, the observations range from 0 to 80-year old without any gaps in between. There are two abrupt peaks: one slightly below 10 and one slightly above 75, suggesting that there are more observations with these two age values. However, no obvious outliers are observed. 
+<br>
+
+#### Distribution of `avg_glucose_level` and `bmi`
+
+We also explored the distribution of `avg_glucose_level` and `bmi` in the training set: 
+```{r}
+# distribution of avg_glucose_level
+ggplot(stroke_train, aes(avg_glucose_level)) + 
+  geom_histogram(binwidth = 5) + 
+  labs(
+    x = "Average Glucose Level", 
+    y = "number of observations", 
+    title = "Distribution of `avg_glucose_level` in the Training Set"
+  )
+```
+<br>
+
+As shown, the distribution of `avg_glucose_level` is severely right-skewed. With the number of observations decreasing abruptly above 110. This result suggests that there are fewer observations with `avg_glucose_level` above 110. This result makes sense, considering the online resources suggest that a normal blood glucose level ranges from 80 to 140. An blood glucose level in the range 140-200 should be considered as prediabetes. Thus, we can implied from the plot that,in the training set, there are more observations with normal blood sugar level than observations with pre-diabetes conditions. 
+<br>
+
+
+```{r}
+# distribution of bmi
+ggplot(stroke_train, aes(bmi)) + 
+  geom_histogram(binwidth = 1) + 
+  labs(
+    x = "BMI (Body Mass Index)", 
+    y = "number of observations", 
+    title = "Distribution of `bmi` in the Training Set"
+  )
+```
+<br>
+
+As shown, the distribution of `bmi` in the training set is also severly right-skewed. There are near-zero observations for `bmi` values above 50 and values below 10. From online resources, we learned that the normal range for BMI value is 18.5 to 25. BMI values less than 18.5 suggest underweight. Values from 25.0 to 30 suggests overweight range, and BMI above 30 suggests obesity. Thus, it makes sense for the distibution of `bmi` values to peak around the range from 25 to 30. 
+<br>
+
+
+```{r}
+ggplot(stroke_train, aes(x = stroke, fill = gender)) + 
+  geom_bar(position = "fill") + 
+  labs(
      x = "whether to have stroke",
      y = "frequency",
      title = "The relationship between whether to have stroke and gender"
-   )
+  )
 ```
+<br>
 The graph shows that the proportion of male having stroke is larger than the proportion of male not having stroke and the proportion of female having stroke is smaller than proportion of female not having stroke. The proportion of male having stroke is larger than female having stroke.
 
 ```{r}
@@ -188,7 +292,7 @@ stroke_mw <- stroke_train %>%
    )
 ```
 We also want to look into the potential relationship between patient work type and whether patient has never married. Then, we observe that patients in children work type and who have never worked have never married before. All the other work types including government-related jobs, private jobs, self-employed have higher proportion in people who have married than who have never married. Therefore, it gives us somewhat strong correlation between `work_type` and `ever_married`.
-### Outcome Variable
+
 
 
 
@@ -240,5 +344,17 @@ stroke_data %>% filter(gender == "Other")
 We also compute proportions of residence type in each work type and it can be seen that there is no strong correlation between whether patient lives and its work type. The only obvious difference is that the proportion of patients who has never worked living in urban area is much higher than living in rural area.
 
 
+Among the relations between the numeric predictors, the correlation between age and bmi seems to be the strongest (most positive). Thus, we plotted the relation between `age` and `bmi` below: 
+```{r}
+ggplot(stroke_train, aes(age, bmi)) + 
+  geom_point() + 
+  geom_smooth(se = FALSE) + 
+  labs(
+    x = "age", 
+    y = "bmi", 
+    title = "The relationship between age and bmi (Body Mass Index)"
+  )
+```
+<br>
 
 ## Conclusion and Implications
