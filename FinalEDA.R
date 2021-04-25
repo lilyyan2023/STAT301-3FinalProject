@@ -1,15 +1,6 @@
 library(tidyverse)
 library(skimr)
-stroke_data <- read_csv("Final Project/healthcare-dataset-stroke-data.csv")
-skim_without_charts(stroke)
-stroke_data<- stroke_data %>% 
-  janitor::clean_names() %>% 
-  mutate(gender = factor(gender),
-         ever_married = factor(ever_married),
-         work_type = factor(work_type),
-         residence_type = factor(residence_type),
-         smoking_status = factor(smoking_status), 
-         stroke = factor(stroke))
+stroke_data <- readRDS("~/Desktop/STAT 301-3/STAT301-3FinalProject/data/processed/stroke_data.rds")
          
  ggplot(stroke_data, aes(x = stroke, fill = gender)) +
    geom_bar(position = "fill") +
