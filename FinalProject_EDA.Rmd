@@ -221,6 +221,7 @@ ggplot(stroke_train, aes(bmi)) +
 As shown, the distribution of `bmi` in the training set is also severly right-skewed. There are near-zero observations for `bmi` values above 50 and values below 10. From online resources, we learned that the normal range for BMI value is 18.5 to 25. BMI values less than 18.5 suggest underweight. Values from 25.0 to 30 suggests overweight range, and BMI above 30 suggests obesity. Thus, it makes sense for the distibution of `bmi` values to peak around the range from 25 to 30. 
 <br>
 
+### Categorical Predictors
 
 ```{r}
 ggplot(stroke_train, aes(x = stroke, fill = gender)) + 
