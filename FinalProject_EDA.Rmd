@@ -1,0 +1,48 @@
+---
+title: "Final Project EDA"
+author: "XI KANG, MINGZE YAN"
+date: "4/25/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This is the EDA section for the Stat 301-3 final project. The goal of this project is to predict one's risk for stroke through a classification approach. 
+<br>
+
+Based on the information from the [World Health Organization (WHO)](https://dx.doi.org/10.2471/BLT.16.181636), stroke is the second leading cause of death and the third leading cause for disability. Nevertheless, effective prevention actions can be applied to reduce the fatal effects of this medical emergency and lower the risk for mortality and disability. Thus, to provide targeted support and effective prevention strategies, it is crucial to identify the risks for stroke based on common factors related to one's lifestyle or chronic health conditions. 
+<br>
+
+Thus, driven by the incentives mentioned above, our project focuses on predicting the risk for stroke based on input parameters about one's lifestyle and health status. The research question of this project is a predictive classification question. 
+<br>
+
+## Initial Overview
+
+### Data Source
+
+The dataset used by this project is the "Stroke Prediction Dataset" provided on [Kaggle](https://www.kaggle.com/fedesoriano/stroke-prediction-dataset). We first loaded in the raw dataset and cleaned the names: 
+```{r}
+## Load raw dataset ----
+stroke_dat <- 
+  read_csv("data/unprocessed/healthcare-dataset-stroke-data.csv") %>% 
+  clean_names()
+```
+<br>
+
+### Dataset Overview
+
+Using methods from `skimr`, we noticed that the original dataset contains 5110 rows and 12 columns. The raw dataset does not have any missing data. The "complete_rate" for all 12 variables is 1, corresponds to 100%. However, during initial skimming, we noticed that there are some observations with value `N/A`, representing missing data. Thus, we replaced the `N/A` values for `bmi` with `NA` using `replace_with_na()`. 
+
+Also, for the convenience of the later processes, we first turned the categorical variables `gender`, `ever_married`, `work_type`, `residence_type`, and `smoking_status` into factors. The outcome variable `stroke` and variables `hypertension` and `heart_disease` were initially identified as numeric variables, but they should be categorical. Thus, we turned them into a factors. Since `id` will not be used as a categorical variable, we removed it from the original dataset. 
+
+## Essential Findings
+
+### Outcome Variable
+
+## Secondary Findings
+
+## Conclusion and Implications
