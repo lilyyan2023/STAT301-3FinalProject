@@ -118,17 +118,6 @@ stroke_train %>%
 As shown, `bmi` is the only variable with missing values and its percentage of missingness is about 4%. Since the degree of missingness is very low, we plan to impute `bmi` using bagged tree imputation. 
 <br>
 
-Also, for the convenience of the later processes, we first turned the categorical variables `gender`, `ever_married`, `work_type`, `residence_type`, and `smoking_status` into factors. The outcome variable `stroke` and variables `hypertension` and `heart_disease` were initially identified as numeric variables, but they should be categorical. Thus, we turned them into a factors. Since `id` will not be used as a categorical variable, we removed it from the original dataset.
-
-We first split data into testing and training datasets and conduct an EDA on training dataset. Then, we graph relationships between response variables and outcome variable and relationships among some selected response variables. The findings are summarized below.
-```{r}
-#split data
-stroke_split <- initial_split(stroke_data, prop = 0.7, strata = stroke)
-stroke_train <- training(stroke_split)
-stroke_test <- testing(stroke_split)
-```
-
-
 ## Essential Findings
 ```{r}
 ggplot(stroke_train, aes(x = stroke, fill = gender)) +
