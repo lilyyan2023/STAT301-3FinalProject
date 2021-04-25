@@ -24,20 +24,49 @@ Thus, driven by the incentives mentioned above, our project focuses on predictin
 
 ### Data Source
 
-The dataset used by this project is the "Stroke Prediction Dataset" provided on [Kaggle](https://www.kaggle.com/fedesoriano/stroke-prediction-dataset). We first loaded in the raw dataset and cleaned the names: 
+The dataset used by this project is the "Stroke Prediction Dataset" provided on [Kaggle](https://www.kaggle.com/fedesoriano/stroke-prediction-dataset). We first loaded in the raw dataset and cleaned the names.  The initial data tidying process it completed in the FinalProject_tidy_data.r file. The code used is presented below:
 ```{r}
 ## Load raw dataset ----
 stroke_dat <- 
   read_csv("data/unprocessed/healthcare-dataset-stroke-data.csv") %>% 
-  clean_names()
+  clean_names() %>% 
+  mutate(
+    gender = factor(gender), 
+    ever_married = factor(ever_married),
+    work_type = factor(work_type),
+    residence_type = factor(residence_type),
+    smoking_status = factor(smoking_status),
+    stroke = factor(stroke, levels = c(1, 0), 
+                    labels = c("Yes", "No")),
+    hypertension = factor(hypertension, levels = c(1, 0), 
+                          labels = c("Yes", "No")), 
+    heart_disease = factor(heart_disease, levels = c(1, 0), 
+                           labels = c("Yes", "No")), 
+    bmi = as.numeric(bmi)
+  ) %>% 
+  select(-id)
+
+## initial skimming ----
+skim_without_charts(stroke_dat)
+
+## save processed data ----
+stroke_dat %>% 
+  write_rds("data/processed/stroke_data.rds")
 ```
 <br>
 
 ### Dataset Overview
 
-Using methods from `skimr`, we noticed that the original dataset contains 5110 rows and 12 columns. The raw dataset does not have any missing data. The "complete_rate" for all 12 variables is 1, corresponds to 100%. However, during initial skimming, we noticed that there are some observations with value `N/A`, representing missing data. Thus, we replaced the `N/A` values for `bmi` with `NA` using `replace_with_na()`. 
+Using methods from `skimr`, we noticed that the original dataset contains 5110 rows and 12 columns. For the convenience of the later processes, we first turned the categorical variables `gender`, `ever_married`, `work_type`, `residence_type`, and `smoking_status` into factors. The outcome variable `stroke` and variables `hypertension` and `heart_disease` were initially identified as numeric variables, but they should be categorical. Thus, we turned them into a factors. Since `id` will not be used as a categorical variable, we removed it from the original dataset. 
+<br>
 
-Also, for the convenience of the later processes, we first turned the categorical variables `gender`, `ever_married`, `work_type`, `residence_type`, and `smoking_status` into factors. The outcome variable `stroke` and variables `hypertension` and `heart_disease` were initially identified as numeric variables, but they should be categorical. Thus, we turned them into a factors. Since `id` will not be used as a categorical variable, we removed it from the original dataset. 
+After initial tidying, we loaded in the processed data performed a train-test split, stratified by the outcome variable `stroke`. We used 70% of the data for training and 30% for testing: 
+```{r}
+
+```
+
+
+### Missing Data
 
 ## Essential Findings
 
