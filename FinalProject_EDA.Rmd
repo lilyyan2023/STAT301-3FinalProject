@@ -6,7 +6,16 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,  message = FALSE, warning = FALSE)
+```
+
+```{r load-packages-set-seed}
+## Load Packages, Set Seed
+library(tidyverse)
+library(tidymodels)
+library(skimr)
+library(naniar)
+set.seed(123)
 ```
 
 ## Introduction
@@ -25,7 +34,7 @@ Thus, driven by the incentives mentioned above, our project focuses on predictin
 ### Data Source
 
 The dataset used by this project is the "Stroke Prediction Dataset" provided on [Kaggle](https://www.kaggle.com/fedesoriano/stroke-prediction-dataset). We first loaded in the raw dataset and cleaned the names.  The initial data tidying process it completed in the FinalProject_tidy_data.r file. The code used is presented below:
-```{r}
+```{r tidy-data, eval=FALSE}
 ## Load raw dataset ----
 stroke_dat <- 
   read_csv("data/unprocessed/healthcare-dataset-stroke-data.csv") %>% 
@@ -61,8 +70,13 @@ Using methods from `skimr`, we noticed that the original dataset contains 5110 r
 <br>
 
 After initial tidying, we loaded in the processed data performed a train-test split, stratified by the outcome variable `stroke`. We used 70% of the data for training and 30% for testing: 
-```{r}
+```{r, load-data-and-split}
+stroke_data <- readRDS("data/processed/stroke_data.rds")
 
+## split data ----
+stroke_split <- initial_split(stroke_data, prop = 0.7, strata = stroke)
+stroke_train <- training(stroke_split)
+stroke_test <- testing(stroke_split)
 ```
 
 

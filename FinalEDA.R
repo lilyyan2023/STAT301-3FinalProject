@@ -1,11 +1,24 @@
+## Load Packages, Set Seed
 library(tidyverse)
 library(tidymodels)
 library(skimr)
-stroke_data <- readRDS("~/Desktop/STAT 301-3/STAT301-3FinalProject/data/processed/stroke_data.rds")
-#split data
+library(naniar)
+set.seed(123)
+
+stroke_data <- readRDS("data/processed/stroke_data.rds")
+## split data ----
 stroke_split <- initial_split(stroke_data, prop = 0.7, strata = stroke)
 stroke_train <- training(stroke_split)
 stroke_test <- testing(stroke_split)
+# check dimension
+dim(stroke_train)
+5110 * 0.7
+dim(stroke_test)
+5110 * 0.3
+
+## missing data ----
+
+## EDA section ----
  ggplot(stroke_train, aes(x = stroke, fill = gender)) +
    geom_bar(position = "fill") +
    labs(
