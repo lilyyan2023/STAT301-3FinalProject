@@ -38,7 +38,7 @@ stroke_dat <-
 Using methods from `skimr`, we noticed that the original dataset contains 5110 rows and 12 columns. The raw dataset does not have any missing data. The "complete_rate" for all 12 variables is 1, corresponds to 100%. However, during initial skimming, we noticed that there are some observations with value `N/A`, representing missing data. Thus, we replaced the `N/A` values for `bmi` with `NA` using `replace_with_na()`. 
 
 Also, for the convenience of the later processes, we first turned the categorical variables `gender`, `ever_married`, `work_type`, `residence_type`, and `smoking_status` into factors. The outcome variable `stroke` and variables `hypertension` and `heart_disease` were initially identified as numeric variables, but they should be categorical. Thus, we turned them into a factors. Since `id` will not be used as a categorical variable, we removed it from the original dataset. 
-
+Then, we graph relationships between response variables and outcome variable and relationships among some selected response variables. The findings are summarized below.
 ## Essential Findings
 
 ### Outcome Variable
