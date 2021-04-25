@@ -6,6 +6,8 @@ stroke_data <- readRDS("~/Desktop/STAT 301-3/STAT301-3FinalProject/data/processe
 stroke_split <- initial_split(stroke_data, prop = 0.7, strata = stroke)
 stroke_train <- training(stroke_split)
 stroke_test <- testing(stroke_split)
+
+# Categorical variables and outcome variable 
  ggplot(stroke_train, aes(x = stroke, fill = gender)) +
    geom_bar(position = "fill") +
    labs(
@@ -13,7 +15,6 @@ stroke_test <- testing(stroke_split)
      y = "frequency",
      title = "The relationship between whether to have stroke and gender"
    )
- 
  ggplot(stroke_train, aes(x = stroke, fill = ever_married)) +
    geom_bar(position = "fill") +
    labs(
@@ -54,6 +55,7 @@ stroke_test <- testing(stroke_split)
      y = "proportion",
      title = "The relationship between whether to have stroke and patient smoking status"
    )
+ # among categorical variable 
  stroke_stg <- stroke_train %>%
    group_by(gender) %>% 
    count(smoking_status) %>% 
@@ -79,6 +81,18 @@ stroke_test <- testing(stroke_split)
      title = "The relationship between patient gender and smoking status"
    )
 
+ stroke_mw <- stroke_train %>%
+   group_by(work_type) %>% 
+   count(ever_married) %>% 
+   mutate(m_prop = n / sum(n))
+ 
+ ggplot(stroke_mw, aes(x = work_type, y = m_prop, fill = ever_married)) +
+   geom_col(position = "dodge") +
+   labs(
+     x = "work_type",
+     y = "proportion",
+     title = "The relationship between patient work type\nand whether patient has ever married"
+   )
  ggplot(stroke_train, aes(x = stroke)) +
    geom_bar()
  
