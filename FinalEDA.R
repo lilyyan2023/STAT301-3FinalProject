@@ -1,8 +1,12 @@
 library(tidyverse)
+library(tidymodels)
 library(skimr)
 stroke_data <- readRDS("~/Desktop/STAT 301-3/STAT301-3FinalProject/data/processed/stroke_data.rds")
-         
- ggplot(stroke_data, aes(x = stroke, fill = gender)) +
+#split data
+stroke_split <- initial_split(stroke_data, prop = 0.7, strata = stroke)
+stroke_train <- training(stroke_split)
+stroke_test <- testing(stroke_split)
+ ggplot(stroke_train, aes(x = stroke, fill = gender)) +
    geom_bar(position = "fill") +
    labs(
      x = "whether to have stroke",
@@ -10,19 +14,19 @@ stroke_data <- readRDS("~/Desktop/STAT 301-3/STAT301-3FinalProject/data/processe
      title = "The relationship between whether to have stroke and gender"
    )
  
- ggplot(stroke_data, aes(x = stroke, fill = ever_married)) +
+ ggplot(stroke_train, aes(x = stroke, fill = ever_married)) +
    geom_bar(position = "fill") +
    labs(
      x = "whether to have stroke",
      y = "frequency",
      title = "The relationship between whether to have stroke and whether ever married"
    )
- stroke_data_wt <- stroke_data %>%
+ stroke_train_wt <- stroke_train %>%
    group_by(stroke) %>% 
    count(work_type) %>% 
    mutate(wt_prop = n / sum(n))
  
- ggplot(stroke_data_wt, aes(x = stroke, y = wt_prop, fill = work_type)) +
+ ggplot(stroke_train_wt, aes(x = stroke, y = wt_prop, fill = work_type)) +
    geom_col(position = "dodge") +
    labs(
      x = "whether to have stroke",
@@ -30,7 +34,7 @@ stroke_data <- readRDS("~/Desktop/STAT 301-3/STAT301-3FinalProject/data/processe
      title = "The relationship between whether to have stroke and patient work type"
    )
  
- ggplot(stroke_data, aes(x = stroke, fill = residence_type)) +
+ ggplot(stroke_train, aes(x = stroke, fill = residence_type)) +
    geom_bar(position = "fill") +
    labs(
      x = "whether to have stroke",
@@ -38,7 +42,7 @@ stroke_data <- readRDS("~/Desktop/STAT 301-3/STAT301-3FinalProject/data/processe
      title = "The relationship between whether to have stroke and patient residence type"
    )
  
- stroke_st <- stroke_data %>%
+ stroke_st <- stroke_train %>%
    group_by(stroke) %>% 
    count(smoking_status) %>% 
    mutate(st_prop = n / sum(n))
@@ -50,7 +54,7 @@ stroke_data <- readRDS("~/Desktop/STAT 301-3/STAT301-3FinalProject/data/processe
      y = "proportion",
      title = "The relationship between whether to have stroke and patient smoking status"
    )
- stroke_stg <- stroke_data %>%
+ stroke_stg <- stroke_train %>%
    group_by(gender) %>% 
    count(smoking_status) %>% 
    mutate(st_prop = n / sum(n))
@@ -62,7 +66,7 @@ stroke_data <- readRDS("~/Desktop/STAT 301-3/STAT301-3FinalProject/data/processe
      y = "proportion",
      title = "The relationship between patient gender and smoking status"
    )
- stroke_wtr <- stroke_data %>%
+ stroke_wtr <- stroke_train %>%
    group_by(work_type) %>% 
    count(residence_type) %>% 
    mutate(rt_prop = n / sum(n))
@@ -75,6 +79,6 @@ stroke_data <- readRDS("~/Desktop/STAT 301-3/STAT301-3FinalProject/data/processe
      title = "The relationship between patient gender and smoking status"
    )
 
- ggplot(stroke_data, aes(x = stroke)) +
+ ggplot(stroke_train, aes(x = stroke)) +
    geom_bar()
  

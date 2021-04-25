@@ -66,8 +66,13 @@ After initial tidying, we loaded in the processed data performed a train-test sp
 ```
 
 
+<<<<<<< HEAD
 ### Missing Data
 
+=======
+Also, for the convenience of the later processes, we first turned the categorical variables `gender`, `ever_married`, `work_type`, `residence_type`, and `smoking_status` into factors. The outcome variable `stroke` and variables `hypertension` and `heart_disease` were initially identified as numeric variables, but they should be categorical. Thus, we turned them into a factors. Since `id` will not be used as a categorical variable, we removed it from the original dataset. 
+Then, we graph relationships between response variables and outcome variable and relationships among some selected response variables. The findings are summarized below.
+>>>>>>> 1ac5ea277bf6765c5cf3dd70b53153ad55cae465
 ## Essential Findings
 
 ### Outcome Variable
