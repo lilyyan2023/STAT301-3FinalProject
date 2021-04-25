@@ -3,6 +3,7 @@ library(tidyverse)
 library(tidymodels)
 library(skimr)
 library(naniar)
+library(kableExtra)
 set.seed(123)
 
 stroke_data <- readRDS("data/processed/stroke_data.rds")
@@ -16,7 +17,26 @@ dim(stroke_train)
 dim(stroke_test)
 5110 * 0.3
 
+# skim the trainig set
+stroke_train %>% skim_without_charts()
+
 ## missing data ----
+
+# overview of missingness
+stroke_train %>% 
+   vis_miss(sort_miss = TRUE)
+
+# overview table
+stroke_train %>% 
+   miss_var_summary() %>% 
+   kbl() %>% 
+   kable_classic() %>% 
+   kable_styling(bootstrap_options = c("striped", "hover")) %>% 
+   row_spec(1, color = "white",
+            background = "blue") %>% 
+   kableExtra::footnote(
+      general = "Number and Percentage of Missing Values in Each Variable"
+   )
 
 ## EDA section ----
  ggplot(stroke_train, aes(x = stroke, fill = gender)) +

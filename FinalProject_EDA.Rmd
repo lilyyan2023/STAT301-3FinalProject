@@ -15,6 +15,7 @@ library(tidyverse)
 library(tidymodels)
 library(skimr)
 library(naniar)
+library(kableExtra)
 set.seed(123)
 ```
 
@@ -78,9 +79,42 @@ stroke_split <- initial_split(stroke_data, prop = 0.7, strata = stroke)
 stroke_train <- training(stroke_split)
 stroke_test <- testing(stroke_split)
 ```
+<br>
+
+The EDA section will be performed using the training set data, `stroke_train`.
+<br>
+
+After the split, we first obtained an overview on the training set using the methods from the `skimr` package. We noticed that the training set contains 11 variables, and 3577 observations. Among them 8 variables are factors and 3 variables are numeric. The outcome variable `stroke` is a categorical variable of type factor. 
+<br>
 
 ### Missing Data
 
+During the initial skimming, we noticed that only one variable `bmi` contains missing values. To obtain a wholistic overview on the general situation of missingness in the training data, we created a plot showing the amount of missing data in each column using the `vis_miss()` function from `naniar`: 
+```{r, fig.height = 7, fig.width = 7}
+# overview of missingness
+stroke_train %>% 
+  vis_miss(sort_miss = TRUE)
+```
+<br>
+
+As shown, within the 11 columns in the dataset, there is only column `bmi` with missing data. The response variable `stroke` does not have any missing values. To clearly present the percentage of missingness for each variable, we created the table below using `miss_var_summary()`, and we highlighted the rows for the variable with missing value in blue:  
+```{r}
+# overview table
+stroke_train %>% 
+  miss_var_summary() %>% 
+  kbl() %>% 
+  kable_classic() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover")) %>% 
+  row_spec(1, color = "white",
+           background = "blue") %>% 
+  kableExtra::footnote(
+    general = "Number and Percentage of Missing Values in Each Variable"
+  )
+```
+<br>
+
+As shown, `bmi` is the only variable with missing values and its percentage of missingness is about 4%. Since the degree of missingness is very low, we plan to impute `bmi` using bagged tree imputation. 
+<br>
 
 ## Essential Findings
 
