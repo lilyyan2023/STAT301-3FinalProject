@@ -3,6 +3,8 @@ title: "Final Project EDA"
 author: "XI KANG, MINGZE YAN"
 date: "4/25/2021"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -116,12 +118,138 @@ stroke_train %>%
 As shown, `bmi` is the only variable with missing values and its percentage of missingness is about 4%. Since the degree of missingness is very low, we plan to impute `bmi` using bagged tree imputation. 
 <br>
 
-## Essential Findings
+Also, for the convenience of the later processes, we first turned the categorical variables `gender`, `ever_married`, `work_type`, `residence_type`, and `smoking_status` into factors. The outcome variable `stroke` and variables `hypertension` and `heart_disease` were initially identified as numeric variables, but they should be categorical. Thus, we turned them into a factors. Since `id` will not be used as a categorical variable, we removed it from the original dataset.
 
+We first split data into testing and training datasets and conduct an EDA on training dataset. Then, we graph relationships between response variables and outcome variable and relationships among some selected response variables. The findings are summarized below.
+```{r}
+#split data
+stroke_split <- initial_split(stroke_data, prop = 0.7, strata = stroke)
+stroke_train <- training(stroke_split)
+stroke_test <- testing(stroke_split)
+```
+
+
+## Essential Findings
+```{r}
+ggplot(stroke_train, aes(x = stroke, fill = gender)) +
+   geom_bar(position = "fill") +
+   labs(
+     x = "whether to have stroke",
+     y = "frequency",
+     title = "The relationship between whether to have stroke and gender"
+   )
+```
+The graph shows that the proportion of male having stroke is larger than the proportion of male not having stroke and the proportion of female having stroke is smaller than proportion of female not having stroke. The proportion of male having stroke is larger than female having stroke.
+
+```{r}
+ggplot(stroke_train, aes(x = stroke, fill = ever_married)) +
+   geom_bar(position = "fill") +
+   labs(
+     x = "whether to have stroke",
+     y = "frequency",
+     title = "The relationship between whether to have stroke and whether ever married"
+   )
+```
+The graph shows that the proportion of patients ever married having stroke is much higher than the proportion of patients not ever married. However, the proportion of patients ever married having stroke is  higher than the proportion of patients not ever married. It might be caused by many patients have married before. Nevertheless, the huge difference between patients ever married and not ever married having stroke indicates a potential correlation between `ever_married` and `stroke`.
+
+```{r}
+stroke_train_wt <- stroke_train %>%
+   group_by(stroke) %>% 
+   count(work_type) %>% 
+   mutate(wt_prop = n / sum(n))
+ 
+ ggplot(stroke_train_wt, aes(x = stroke, y = wt_prop, fill = work_type)) +
+   geom_col(position = "dodge") +
+   labs(
+     x = "whether to have stroke",
+     y = "proportion",
+     title = "The relationship between whether to have stroke and patient work type"
+   )
+```
+By computing each work type proportion, the graph shows that private work type has the largest proportion in both having and not having stroke. children work type has the smallest proportion in having stroke and the third largest proportion in not having stroke. There is no people having stroke who have never worked before and there is only a tiny portion of people not having stroke who have never worked before. 
+
+```{r}
+stroke_st <- stroke_train %>%
+   group_by(stroke) %>% 
+   count(smoking_status) %>% 
+   mutate(st_prop = n / sum(n))
+ 
+ ggplot(stroke_st, aes(x = stroke, y = st_prop, fill = smoking_status)) +
+   geom_col(position = "dodge") +
+   labs(
+     x = "whether to have stroke",
+     y = "proportion",
+     title = "The relationship between whether to have stroke and patient smoking status"
+   )
+```
+By calculating the proportion of people's smoking status in each group, the graph indicates that the proportion of people who never smoked is the largest in both people having stroke and not having stroke. Moreover, the proportion of people who have never smoked is larger for people not having stroke than having stroke. The proportion of people who have formerly smoked in having stroke is much higher than in not having stroke. The proportion of people who smokes in having stroke is a little more than in not having stroke. Finally, the proportion of people whose smoking status is unknown has the second largest proportion in not having stroke which will add some difficulty in our understanding. 
+
+```{r}
+stroke_mw <- stroke_train %>%
+   group_by(work_type) %>% 
+   count(ever_married) %>% 
+   mutate(m_prop = n / sum(n))
+ 
+ ggplot(stroke_mw, aes(x = work_type, y = m_prop, fill = ever_married)) +
+   geom_col(position = "dodge") +
+   labs(
+     x = "work_type",
+     y = "proportion",
+     title = "The relationship between patient work type\nand whether patient has ever married"
+   )
+```
+We also want to look into the potential relationship between patient work type and whether patient has never married. Then, we observe that patients in children work type and who have never worked have never married before. All the other work types including government-related jobs, private jobs, self-employed have higher proportion in people who have married than who have never married. Therefore, it gives us somewhat strong correlation between `work_type` and `ever_married`.
 ### Outcome Variable
 
 
 
 ## Secondary Findings
+```{r}
+ggplot(stroke_train, aes(x = stroke, fill = residence_type)) +
+   geom_bar(position = "fill") +
+   labs(
+     x = "whether to have stroke",
+     y = "frequency",
+     title = "The relationship between whether to have stroke and patient residence type"
+   )
+```
+The graph shows that there is basically no difference between whether patient lives and whether they have stroke. Therefore, we can potentially eliminate this variable out of our predictive model.
+
+```{r}
+stroke_stg <- stroke_train %>%
+   group_by(gender) %>% 
+   count(smoking_status) %>% 
+   mutate(st_prop = n / sum(n))
+ 
+ ggplot(stroke_stg, aes(x = gender, y = st_prop, fill = smoking_status)) +
+   geom_col(position = "dodge") +
+   labs(
+     x = "gender",
+     y = "proportion",
+     title = "The relationship between patient gender and smoking status"
+   )
+```
+Then, we find out proportions of people's smoking status in each gender and the graph doesn't show an obvious correlation between gender and each group of smoking_status. It can be noticed that the proportion of female who never smoked is higher than the proportion of male who never smoked. It is also worth noting that Other gender has formerly smoked because there is only one person whose gender is Other. 
+```{r}
+stroke_data %>% filter(gender == "Other")
+```
+
+```{r}
+ stroke_wtr <- stroke_train %>%
+   group_by(work_type) %>% 
+   count(residence_type) %>% 
+   mutate(rt_prop = n / sum(n))
+ 
+ ggplot(stroke_wtr, aes(x = work_type, y = rt_prop, fill = residence_type)) +
+   geom_col(position = "dodge") +
+   labs(
+     x = "work_type",
+     y = "proportion",
+     title = "The relationship between patient gender and smoking status"
+   )
+```
+We also compute proportions of residence type in each work type and it can be seen that there is no strong correlation between whether patient lives and its work type. The only obvious difference is that the proportion of patients who has never worked living in urban area is much higher than living in rural area.
+
+
 
 ## Conclusion and Implications
