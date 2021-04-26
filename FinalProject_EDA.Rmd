@@ -73,7 +73,7 @@ stroke_dat %>%
 Using methods from `skimr`, we noticed that the original dataset contains 5110 rows and 12 columns. For the convenience of the later processes, we first turned the categorical variables `gender`, `ever_married`, `work_type`, `residence_type`, and `smoking_status` into factors. The outcome variable `stroke` and variables `hypertension` and `heart_disease` were initially identified as numeric variables, but they should be categorical. Thus, we turned them into a factors. Since `id` will not be used as a categorical variable, we removed it from the original dataset. 
 <br>
 
-After initial tidying, we loaded in the processed data performed a train-test split, stratified by the outcome variable `stroke`. We used 70% of the data for training and 30% for testing: 
+After initial tidying, we loaded in the processed data and performed a train-test split, stratified by the outcome variable `stroke`. We used 70% of the data for training and 30% for testing: 
 ```{r, load-data-and-split}
 stroke_data <- readRDS("data/processed/stroke_data.rds")
 
@@ -167,7 +167,33 @@ stroke_train %>%
 ```
 <br>
 
-As shown, there is no near-perfect collinearity between any pair of number predictors. All three variables are positively related to each other. 
+As shown, there is no near-perfect collinearity between any pair of number predictors. All three variables are positively related to each other. A table showing the correlation between the numeric predictors is also presented below: 
+```{r}
+# correlation between predictors
+stroke_train %>% 
+  select(age, avg_glucose_level, bmi) %>% 
+  
+  drop_na() %>% 
+  # compute correlation matrix
+  correlate() %>% 
+  # turn into a tibble
+  stretch() %>% 
+  rename("correlation" = "r") %>% 
+  arrange(desc(correlation)) %>%
+  # temporary var `row_id` to help removing repeated info
+  mutate(row_id = row_number()) %>% 
+  # filter out even rows
+  drop_na() %>% 
+  filter(row_id %% 2 == 0) %>% 
+  # remove temporary var
+  select(-row_id) %>%
+  kbl() %>% 
+  kable_classic()
+```
+<br>
+
+As shown, the highest correlation coefficient is between variables `bmi` and `age`, which is 0.3461315. The table comfirms that there is no strong linear correlation between the numeric predictors.
+<br>
 
 #### `age` predictor
 
@@ -187,7 +213,22 @@ ggplot(stroke_train, aes(age)) +
 As shown, the distribution of `age` is about normal. Also, the observations range from 0 to 80-year old without any gaps in between. There are two abrupt peaks: one slightly below 10 and one slightly above 75, suggesting that there are more observations with these two age values. However, no obvious outliers are observed. 
 <br>
 
-#### Distribution of `avg_glucose_level` and `bmi`
+We then explored the relation between `age` and the outcome variable `stroke` using the boxplot below: 
+```{r}
+# relation between `age` and `stroke`
+ggplot(stroke_train, aes(age, stroke)) + 
+  geom_boxplot() + 
+  labs(
+     x = "Age",
+     y = "Stroke",
+     title = "The relationship between whether to have stroke and age"
+  )
+```
+<br>
+
+As shown, there is a clear correlation between age and an individual's chance of getting stroke. In the training set, almost all observations with value `Yes` for `stroke` have age above 35, with the exception of one outlier at around 17. Also, the median for the `age` value for observations with `No` for `stroke` is just above 40, much lower than the median for the observations with `Yes` for `stroke` (above 70). It can be implied that, in the dataset used, individuals who had stroke tend to be older in age. 
+
+#### Skewness in `avg_glucose_level` and `bmi`
 
 We also explored the distribution of `avg_glucose_level` and `bmi` in the training set: 
 ```{r}
@@ -221,6 +262,11 @@ ggplot(stroke_train, aes(bmi)) +
 As shown, the distribution of `bmi` in the training set is also severly right-skewed. There are near-zero observations for `bmi` values above 50 and values below 10. From online resources, we learned that the normal range for BMI value is 18.5 to 25. BMI values less than 18.5 suggest underweight. Values from 25.0 to 30 suggests overweight range, and BMI above 30 suggests obesity. Thus, it makes sense for the distibution of `bmi` values to peak around the range from 25 to 30. 
 <br>
 
+Based on the observed skewness, we decided to log-transform variables `avg_glucose_level` and `bmi` in creating the recipes later. 
+<br>
+
+
+
 ### Categorical Predictors
 
 ```{r}
@@ -233,6 +279,7 @@ ggplot(stroke_train, aes(x = stroke, fill = gender)) +
   )
 ```
 <br>
+
 The graph shows that the proportion of male having stroke is larger than the proportion of male not having stroke and the proportion of female having stroke is smaller than proportion of female not having stroke. The proportion of male having stroke is larger than female having stroke.
 
 ```{r}
@@ -244,6 +291,8 @@ ggplot(stroke_train, aes(x = stroke, fill = ever_married)) +
      title = "The relationship between whether to have stroke and whether ever married"
    )
 ```
+<br>
+
 The graph shows that the proportion of patients ever married having stroke is much higher than the proportion of patients not ever married. However, the proportion of patients ever married having stroke is  higher than the proportion of patients not ever married. It might be caused by many patients have married before. Nevertheless, the huge difference between patients ever married and not ever married having stroke indicates a potential correlation between `ever_married` and `stroke`.
 
 ```{r}
@@ -260,6 +309,8 @@ stroke_train_wt <- stroke_train %>%
      title = "The relationship between whether to have stroke and patient work type"
    )
 ```
+<br>
+
 By computing each work type proportion, the graph shows that private work type has the largest proportion in both having and not having stroke. children work type has the smallest proportion in having stroke and the third largest proportion in not having stroke. There is no people having stroke who have never worked before and there is only a tiny portion of people not having stroke who have never worked before. 
 
 ```{r}
@@ -276,6 +327,8 @@ stroke_st <- stroke_train %>%
      title = "The relationship between whether to have stroke and patient smoking status"
    )
 ```
+<br>
+
 By calculating the proportion of people's smoking status in each group, the graph indicates that the proportion of people who never smoked is the largest in both people having stroke and not having stroke. Moreover, the proportion of people who have never smoked is larger for people not having stroke than having stroke. The proportion of people who have formerly smoked in having stroke is much higher than in not having stroke. The proportion of people who smokes in having stroke is a little more than in not having stroke. Finally, the proportion of people whose smoking status is unknown has the second largest proportion in not having stroke which will add some difficulty in our understanding. 
 
 ```{r}
@@ -292,6 +345,8 @@ stroke_mw <- stroke_train %>%
      title = "The relationship between patient work type\nand whether patient has ever married"
    )
 ```
+<br>
+
 We also want to look into the potential relationship between patient work type and whether patient has never married. Then, we observe that patients in children work type and who have never worked have never married before. All the other work types including government-related jobs, private jobs, self-employed have higher proportion in people who have married than who have never married. Therefore, it gives us somewhat strong correlation between `work_type` and `ever_married`.
 
 
@@ -345,17 +400,24 @@ stroke_data %>% filter(gender == "Other")
 We also compute proportions of residence type in each work type and it can be seen that there is no strong correlation between whether patient lives and its work type. The only obvious difference is that the proportion of patients who has never worked living in urban area is much higher than living in rural area.
 
 
-Among the relations between the numeric predictors, the correlation between age and bmi seems to be the strongest (most positive). Thus, we plotted the relation between `age` and `bmi` below: 
+#### Relation between `stroke` and `avg_glucose_level`
+
+According to common understandings, the risk for stroke is often associated with the average glucose level of an indivual. Thus, we chose to explore the relation between the outcome variable `strok` and `avg_glucose_level` using the boxplot below: 
+
 ```{r}
-ggplot(stroke_train, aes(age, bmi)) + 
-  geom_point() + 
-  geom_smooth(se = FALSE) + 
+# relation between `age` and `stroke`
+ggplot(stroke_train, aes(avg_glucose_level, stroke)) + 
+  geom_boxplot() + 
   labs(
-    x = "age", 
-    y = "bmi", 
-    title = "The relationship between age and bmi (Body Mass Index)"
+     x = "Average Glucose Level",
+     y = "Stroke",
+     title = "The relationship between stroke and average glucose level"
   )
 ```
 <br>
+
+As shown, for observations with value `Yes` for `stroke` the interquantile range for the distribution of the average glucose level is much wider than the distribution of the average glucose level for level `No` of the `stroke`. Also, the median average glucose level for observations with `stroke` value `Yes` is larger than the the median average glucose level for observations with `stroke` value `No`. The distribution of average glucose level values is also more right-skewed for observations with `stroke` value `No`. For observations with `stroke` value `No`, average glucose level above around 180 are considered as outliers. We can infer from the plot that, for the sample population used for collecting this data, individuals with average glucose level above 125 are more likely to get stroke.
+
+
 
 ## Conclusion and Implications
