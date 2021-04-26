@@ -1,0 +1,25 @@
+---
+title: "Codebook"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Description
+`stroke_data` is downloaded from rom Kaggle (https://www.kaggle.com/fedesoriano/stroke-prediction-dataset). It includes in total 5110 observations and 11 variables. This dataset is used to predict whether a patient is likely to get stroke based on the input parameters like gender, age, various diseases, and smoking status. Each row in the data provides relevant information about the patient.
+
+## Variables Definition
+1) gender: patient gender ("Male", "Female" or "Other")
+2) age: age of the patient
+3) hypertension: 0 if the patient doesn't have hypertension, 1 if the patient has hypertension
+4) heart_disease: 0 if the patient doesn't have any heart diseases, 1 if the patient has a heart disease
+5) ever_married: whether patient has ever married ("No" or "Yes")
+6) work_type: patient work type ("children", "Govt_jov", "Never_worked", "Private" or "Self-employed")
+7) Residence_type: where patient lives ("Rural" or "Urban")
+8) avg_glucose_level: average glucose level in blood
+9) bmi: body mass index
+10) smoking_status: patient's smoking status ("formerly smoked", "never smoked", "smokes" or "Unknown"*)
+11) stroke: 1 if the patient had a stroke or 0 if not
+*Note: "Unknown" in smoking_status means that the information is unavailable for this patient
