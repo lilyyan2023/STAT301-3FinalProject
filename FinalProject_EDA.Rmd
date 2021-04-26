@@ -202,7 +202,7 @@ ggplot(stroke_train, aes(avg_glucose_level)) +
 ```
 <br>
 
-As shown, the distribution of `avg_glucose_level` is severely right-skewed. With the number of observations decreasing abruptly above 110. This result suggests that there are fewer observations with `avg_glucose_level` above 110. This result makes sense, considering the online resources suggest that a normal blood glucose level ranges from 80 to 140. An blood glucose level in the range 140-200 should be considered as prediabetes. Thus, we can implied from the plot that,in the training set, there are more observations with normal blood sugar level than observations with pre-diabetes conditions. 
+As shown, the distribution of `avg_glucose_level` is severely right-skewed. With the number of observations decreasing abruptly above 110. This result suggests that there are fewer observations with `avg_glucose_level` above 110. This result makes sense, considering the online resources suggest that a normal blood glucose level ranges from 80 to 140. An blood glucose level in the range 140-200 should be considered as pre-diabetes. Thus, we can imply from the plot that,in the training set, there are more observations with normal blood sugar level than observations with pre-diabetes conditions. 
 <br>
 
 
@@ -218,11 +218,99 @@ ggplot(stroke_train, aes(bmi)) +
 ```
 <br>
 
-As shown, the distribution of `bmi` in the training set is also severly right-skewed. There are near-zero observations for `bmi` values above 50 and values below 10. From online resources, we learned that the normal range for BMI value is 18.5 to 25. BMI values less than 18.5 suggest underweight. Values from 25.0 to 30 suggests overweight range, and BMI above 30 suggests obesity. Thus, it makes sense for the distibution of `bmi` values to peak around the range from 25 to 30. 
+As shown, the distribution of `bmi` in the training set is also severly right-skewed. There are near-zero observations for `bmi` values above 50 and values below 10. From online resources, we learned that the normal range for BMI value is 18.5 to 25. BMI values less than 18.5 suggest underweight. Values from 25.0 to 30 suggests overweight range, and BMI above 30 suggests obesity. Thus, it makes sense for the distribution of `bmi` values to peak around the range from 25 to 30. 
 <br>
 
 ### Categorical Predictors
+#### Distribution of `gender`
+```{r}
+ggplot(stroke_train, aes(x = gender)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of gender"
+  ) +
+  theme_minimal()
+```
+The distribution of gender shows that there are around 600 more female patients in the training data than male ones and only one patient classifying itself as `Other` gender.
 
+#### Distribution of `ever_married` and `smoking_status`
+```{r}
+ggplot(stroke_train, aes(x = ever_married)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of ever_married"
+  ) +
+  theme_minimal()
+```
+The graph shows that there are approximately 1100 more patients having married before. 
+
+```{r}
+ggplot(stroke_train, aes(x = smoking_status)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of smoking_status"
+  ) +
+  theme_minimal()
+```
+The distribution of `smoking_status` shows that patients having never smoked are the largest (1333) and patients who have unknown smoking status are the second largest (1081). Patients who smoke and formerly smoked are only 55 apart and there is no huge difference between these two types of patients.
+
+#### Distribution of `work_type` and `residence_type`
+```{r}
+ggplot(stroke_train, aes(x = work_type)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of work_type"
+  ) +
+  theme_minimal()
+```
+The graph shows that the number of patients having `children`, `Govt_job` types of work are pretty much the same and the number of patients who are self-employed are a little more. The number of patients who have never worked is only 17 and is the least. The number of patients who have private jobs is the largest (2047). Therefore, if patients who are self-employed have fewer proportion in the following graph, it makes sense.
+
+```{r}
+ggplot(stroke_train, aes(x = residence_type)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of residence_type"
+  ) +
+  theme_minimal()
+```
+The graph shows that the number of patients staying in urban area and rural area is pretty close with more around 80 patients more living in urban area.
+
+#### `gender` and `stroke`
 ```{r}
 ggplot(stroke_train, aes(x = stroke, fill = gender)) + 
   geom_bar(position = "fill") + 
@@ -235,6 +323,7 @@ ggplot(stroke_train, aes(x = stroke, fill = gender)) +
 <br>
 The graph shows that the proportion of male having stroke is larger than the proportion of male not having stroke and the proportion of female having stroke is smaller than proportion of female not having stroke. The proportion of male having stroke is larger than female having stroke.
 
+#### `ever_married` and `stroke`
 ```{r}
 ggplot(stroke_train, aes(x = stroke, fill = ever_married)) +
    geom_bar(position = "fill") +
@@ -246,6 +335,7 @@ ggplot(stroke_train, aes(x = stroke, fill = ever_married)) +
 ```
 The graph shows that the proportion of patients ever married having stroke is much higher than the proportion of patients not ever married. However, the proportion of patients ever married having stroke is  higher than the proportion of patients not ever married. It might be caused by many patients have married before. Nevertheless, the huge difference between patients ever married and not ever married having stroke indicates a potential correlation between `ever_married` and `stroke`.
 
+#### `work_type` and `stroke`
 ```{r}
 stroke_train_wt <- stroke_train %>%
    group_by(stroke) %>% 
@@ -262,6 +352,7 @@ stroke_train_wt <- stroke_train %>%
 ```
 By computing each work type proportion, the graph shows that private work type has the largest proportion in both having and not having stroke. children work type has the smallest proportion in having stroke and the third largest proportion in not having stroke. There is no people having stroke who have never worked before and there is only a tiny portion of people not having stroke who have never worked before. 
 
+#### `smoking_status` and `stroke`
 ```{r}
 stroke_st <- stroke_train %>%
    group_by(stroke) %>% 
@@ -278,6 +369,7 @@ stroke_st <- stroke_train %>%
 ```
 By calculating the proportion of people's smoking status in each group, the graph indicates that the proportion of people who never smoked is the largest in both people having stroke and not having stroke. Moreover, the proportion of people who have never smoked is larger for people not having stroke than having stroke. The proportion of people who have formerly smoked in having stroke is much higher than in not having stroke. The proportion of people who smokes in having stroke is a little more than in not having stroke. Finally, the proportion of people whose smoking status is unknown has the second largest proportion in not having stroke which will add some difficulty in our understanding. 
 
+#### `work_type` and `ever_married`
 ```{r}
 stroke_mw <- stroke_train %>%
    group_by(work_type) %>% 
@@ -298,6 +390,7 @@ We also want to look into the potential relationship between patient work type a
 
 
 ## Secondary Findings
+#### `residence_type` and `stroke`
 ```{r}
 ggplot(stroke_train, aes(x = stroke, fill = residence_type)) +
    geom_bar(position = "fill") +
@@ -309,6 +402,7 @@ ggplot(stroke_train, aes(x = stroke, fill = residence_type)) +
 ```
 The graph shows that there is basically no difference between whether patient lives and whether they have stroke. Therefore, we can potentially eliminate this variable out of our predictive model.
 
+#### `smoking_status` and `gender`
 ```{r}
 stroke_stg <- stroke_train %>%
    group_by(gender) %>% 
@@ -324,10 +418,8 @@ stroke_stg <- stroke_train %>%
    )
 ```
 Then, we find out proportions of people's smoking status in each gender and the graph doesn't show an obvious correlation between gender and each group of smoking_status. It can be noticed that the proportion of female who never smoked is higher than the proportion of male who never smoked. It is also worth noting that Other gender has formerly smoked because there is only one person whose gender is Other. 
-```{r}
-stroke_data %>% filter(gender == "Other")
-```
 
+#### `work_type` and `residence_type`
 ```{r}
  stroke_wtr <- stroke_train %>%
    group_by(work_type) %>% 
@@ -339,12 +431,12 @@ stroke_data %>% filter(gender == "Other")
    labs(
      x = "work_type",
      y = "proportion",
-     title = "The relationship between patient gender and smoking status"
+     title = "The relationship between patient work type and residence type"
    )
 ```
 We also compute proportions of residence type in each work type and it can be seen that there is no strong correlation between whether patient lives and its work type. The only obvious difference is that the proportion of patients who has never worked living in urban area is much higher than living in rural area.
 
-
+#### `age` and `bmi`
 Among the relations between the numeric predictors, the correlation between age and bmi seems to be the strongest (most positive). Thus, we plotted the relation between `age` and `bmi` below: 
 ```{r}
 ggplot(stroke_train, aes(age, bmi)) + 

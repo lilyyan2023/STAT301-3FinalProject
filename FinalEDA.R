@@ -40,6 +40,77 @@ stroke_train %>%
    )
 
 ## EDA section ----
+# Categorial variables on its own
+ggplot(stroke_train, aes(x = gender)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of gender"
+  ) +
+  theme_minimal()
+
+ggplot(stroke_train, aes(x = ever_married)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of ever_married"
+  ) +
+  theme_minimal()
+
+ggplot(stroke_train, aes(x = smoking_status)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of smoking_status"
+  ) +
+  theme_minimal()
+
+ggplot(stroke_train, aes(x = work_type)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of work_type"
+  ) +
+  theme_minimal()
+
+ggplot(stroke_train, aes(x = residence_type)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of residence_type"
+  ) +
+  theme_minimal()
+
 # Categorical variables and outcome variable 
 
  ggplot(stroke_train, aes(x = stroke, fill = gender)) +
@@ -112,7 +183,7 @@ stroke_train %>%
    labs(
      x = "work_type",
      y = "proportion",
-     title = "The relationship between patient gender and smoking status"
+     title = "The relationship between patient work type and residence type"
    )
 
  stroke_mw <- stroke_train %>%
