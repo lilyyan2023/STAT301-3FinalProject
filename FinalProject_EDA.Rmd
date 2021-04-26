@@ -543,3 +543,7 @@ Moreover, there is no strong linear correlation between any pair of numeric pred
 Thirdly, extreme right-skewness is observed in the distributions of `avg_glucose_level` and `bmi`, suggesting the need to use log-transformation in creating the recipe. 
 
 Lastly, less occurring levels are observed in categorical predictors `gender`, `smoking_status`, and `work_type`, suggesting the need to use `step_zv()` and `step_nzv()` in creating the recipe. 
+
+## GitHub Link
+
+[https://github.com/lilyyan2023/STAT301-3FinalProject](https://github.com/lilyyan2023/STAT301-3FinalProject){target="_blank"}
