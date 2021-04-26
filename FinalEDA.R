@@ -40,6 +40,111 @@ stroke_train %>%
    )
 
 ## EDA section ----
+
+# outcome var
+# plot
+stroke_train %>%
+   ggplot(aes(stroke, fill = stroke)) + 
+   geom_bar(show.legend = FALSE) + 
+   labs(
+      x = "Stroke", 
+      y = "Number of Observations", 
+      title = "Distribution of Response Variable"
+   ) + 
+   geom_text(
+      aes(label = ..count..), 
+      stat = "count",
+      position = position_dodge(width = 0.9), 
+      vjust = -0.25
+   )
+
+# Numeric Vars
+# correlation plot
+stroke_train %>% 
+   select(age, avg_glucose_level, bmi) %>% 
+   
+   drop_na() %>% 
+   # compute correlation matrix
+   cor() %>% 
+   # visualize
+   corrplot(type = "upper", 
+            title = "Correlations between Numeric Variables", 
+            mar = c(0, 0, 1, 0))
+
+# correlation between predictors
+stroke_train %>% 
+   select(age, avg_glucose_level, bmi) %>% 
+   drop_na() %>% 
+   # compute correlation matrix
+   correlate() %>% 
+   # turn into a tibble
+   stretch() %>% 
+   rename("correlation" = "r") %>% 
+   arrange(desc(correlation)) %>%
+   # temporary var `row_id` to help removing repeated info
+   mutate(row_id = row_number()) %>% 
+   # filter out even rows
+   drop_na() %>% 
+   filter(row_id %% 2 == 0) %>% 
+   # remove temporary var
+   select(-row_id) %>%
+   kbl() %>% 
+   kable_classic()
+
+# distribution of age
+ggplot(stroke_train, aes(age)) + 
+   geom_histogram(binwidth = 1) + 
+   labs(
+      x = "age", 
+      y = "number of observations", 
+      title = "Distribution of `age` in the Training Set"
+   )
+
+# relation between `age` and `stroke`
+ggplot(stroke_train, aes(age, stroke)) + 
+   geom_boxplot() + 
+   labs(
+      x = "Age",
+      y = "Stroke",
+      title = "The relationship between whether to have stroke and age"
+   )
+
+# relation between `age` and `heart_disease`
+ggplot(stroke_train, aes(age, heart_disease)) + 
+   geom_boxplot() + 
+   labs(
+      x = "Age",
+      y = "Heart Disease",
+      title = "The relationship between whether to have heart disease and age"
+   )
+
+# distribution of avg_glucose_level
+ggplot(stroke_train, aes(avg_glucose_level)) + 
+   geom_histogram(binwidth = 5) + 
+   labs(
+      x = "Average Glucose Level", 
+      y = "number of observations", 
+      title = "Distribution of `avg_glucose_level` in the Training Set"
+   )
+
+# distribution of bmi
+ggplot(stroke_train, aes(bmi)) + 
+   geom_histogram(binwidth = 1) + 
+   labs(
+      x = "BMI (Body Mass Index)", 
+      y = "number of observations", 
+      title = "Distribution of `bmi` in the Training Set"
+   )
+
+# relation between `avg_glucose_level` and `stroke`
+ggplot(stroke_train, aes(avg_glucose_level, stroke)) + 
+   geom_boxplot() + 
+   labs(
+      x = "Average Glucose Level",
+      y = "Stroke",
+      title = "The relationship between stroke and average glucose level"
+   )
+
 # Categorial variables on its own
 ggplot(stroke_train, aes(x = gender)) +
   geom_bar() +

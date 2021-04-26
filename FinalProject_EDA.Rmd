@@ -2,9 +2,12 @@
 title: "Final Project EDA"
 author: "XI KANG, MINGZE YAN"
 date: "4/25/2021"
-output: html_document
-editor_options: 
-  chunk_output_type: console
+output:
+  html_document: 
+    code_folding: hide
+    toc: true
+    toc_float: true
+    highlight: "tango"
 ---
 
 ```{r setup, include=FALSE}
@@ -19,6 +22,7 @@ library(skimr)
 library(naniar)
 library(kableExtra)
 library(corrplot)
+library(corrr)
 set.seed(123)
 ```
 
@@ -125,7 +129,6 @@ As shown, `bmi` is the only variable with missing values and its percentage of m
 
 We first performed a univariate investigation of the response variable `stroke`. The barchart below provides an overview on the distribution of `stroke` in the training set: 
 ```{r outcome-var-plot, fig.height= 7, fig.width=7}
-
 # plot
 stroke_train %>%
   ggplot(aes(stroke, fill = stroke)) + 
@@ -172,7 +175,6 @@ As shown, there is no near-perfect collinearity between any pair of number predi
 # correlation between predictors
 stroke_train %>% 
   select(age, avg_glucose_level, bmi) %>% 
-  
   drop_na() %>% 
   # compute correlation matrix
   correlate() %>% 
@@ -228,6 +230,24 @@ ggplot(stroke_train, aes(age, stroke)) +
 
 As shown, there is a clear correlation between age and an individual's chance of getting stroke. In the training set, almost all observations with value `Yes` for `stroke` have age above 35, with the exception of one outlier at around 17. Also, the median for the `age` value for observations with `No` for `stroke` is just above 40, much lower than the median for the observations with `Yes` for `stroke` (above 70). It can be implied that, in the dataset used, individuals who had stroke tend to be older in age. 
 
+##### Relation between `age` and `heart_disease`
+
+Age is often considered as an important factor determing one's risk for heart disease. Thus, we used boxplot to explore the relation between `age` and `heart_disease` in the training set: 
+```{r}
+# relation between `age` and `heart_disease`
+ggplot(stroke_train, aes(age, heart_disease)) + 
+  geom_boxplot() + 
+  labs(
+     x = "Age",
+     y = "Heart Disease",
+     title = "The relationship between whether to have heart disease and age"
+  )
+```
+<br>
+
+As shown, the distribution of `age` is severely left-skewed for `heart_disease` with level `Yes`. This visualization suggests the correlation between `heart_disease` and `age`. Among the sample population from which the data was obtained, individual older in age are more likely to get heart disease. 
+
+
 #### Skewness in `avg_glucose_level` and `bmi`
 
 We also explored the distribution of `avg_glucose_level` and `bmi` in the training set: 
@@ -245,7 +265,6 @@ ggplot(stroke_train, aes(avg_glucose_level)) +
 
 As shown, the distribution of `avg_glucose_level` is severely right-skewed. With the number of observations decreasing abruptly above 110. This result suggests that there are fewer observations with `avg_glucose_level` above 110. This result makes sense, considering the online resources suggest that a normal blood glucose level ranges from 80 to 140. An blood glucose level in the range 140-200 should be considered as pre-diabetes. Thus, we can imply from the plot that,in the training set, there are more observations with normal blood sugar level than observations with pre-diabetes conditions. 
 <br>
-
 
 ```{r}
 # distribution of bmi
@@ -266,27 +285,12 @@ Based on the observed skewness, we decided to log-transform variables `avg_gluco
 <br>
 
 
-
 ### Categorical Predictors
-#### Distribution of `gender`
-```{r}
-ggplot(stroke_train, aes(x = gender)) +
-  geom_bar() +
-  geom_text(
-    aes(label = ..count..), 
-    stat = "count",
-    position = position_dodge(width = 0.9), 
-    vjust = -0.25,
-    hjust = 0.5
-  ) +
-  labs(
-    title = "Distribution of gender"
-  ) +
-  theme_minimal()
-```
-The distribution of gender shows that there are around 600 more female patients in the training data than male ones and only one patient classifying itself as `Other` gender.
 
-#### Distribution of `ever_married` and `smoking_status`
+#### Class Imbalance in `ever_married`
+
+In exploring the categorical predictors, we noticed that there is class imbalance in the distributions of `ever_married`. 
+
 ```{r}
 ggplot(stroke_train, aes(x = ever_married)) +
   geom_bar() +
@@ -302,8 +306,37 @@ ggplot(stroke_train, aes(x = ever_married)) +
   ) +
   theme_minimal()
 ```
-The graph shows that there are approximately 1100 more patients having married before. 
+<br>
+As shown, there are approximately 1100 more patients having married before. If encountering problem in resampling and cross-validation, we might need to consider using random under-sampling or over-sampling. 
 
+#### Less Occurring Values
+
+Observing the distribution of the multi-level categorical variables, we noticed that some variables have severely less occuring values that might cause problems in the later modeling process. Specific recipe steps will be applied based on the situation.
+
+##### Distribution of `gender`
+
+```{r}
+ggplot(stroke_train, aes(x = gender)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of gender"
+  ) +
+  theme_minimal()
+```
+<br>
+
+The distribution of gender shows that there are around 600 more female patients in the training data than male ones and only one patient classifying itself as `Other` gender. To avoid problem caused by less occuring values, `step_zv()` will be applied in creating the recipe.
+
+##### Distribution of `smoking_status`
+
+There is also obvious difference in the number of observations in each level or variable `smoking_status`: 
 ```{r}
 ggplot(stroke_train, aes(x = smoking_status)) +
   geom_bar() +
@@ -319,9 +352,11 @@ ggplot(stroke_train, aes(x = smoking_status)) +
   ) +
   theme_minimal()
 ```
-The distribution of `smoking_status` shows that patients having never smoked are the largest (1333) and patients who have unknown smoking status are the second largest (1081). Patients who smoke and formerly smoked are only 55 apart and there is no huge difference between these two types of patients.
+<br>
 
-#### Distribution of `work_type` and `residence_type`
+As shown by the plot, patients having never smoked are the largest (1333) and patients who have unknown smoking status are the second largest (1081). Patients who smoke and formerly smoked are only 55 apart and there is no huge difference between these two types of patients.
+
+##### Distribution of `work_type`
 ```{r}
 ggplot(stroke_train, aes(x = work_type)) +
   geom_bar() +
@@ -337,26 +372,13 @@ ggplot(stroke_train, aes(x = work_type)) +
   ) +
   theme_minimal()
 ```
-The graph shows that the number of patients having `children`, `Govt_job` types of work are pretty much the same and the number of patients who are self-employed are a little more. The number of patients who have never worked is only 17 and is the least. The number of patients who have private jobs is the largest (2047). Therefore, if patients who are self-employed have fewer proportion in the following graph, it makes sense.
+<br>
 
-```{r}
-ggplot(stroke_train, aes(x = residence_type)) +
-  geom_bar() +
-  geom_text(
-    aes(label = ..count..), 
-    stat = "count",
-    position = position_dodge(width = 0.9), 
-    vjust = -0.25,
-    hjust = 0.5
-  ) +
-  labs(
-    title = "Distribution of residence_type"
-  ) +
-  theme_minimal()
-```
-The graph shows that the number of patients staying in urban area and rural area is pretty close with more around 80 patients more living in urban area.
+The graph shows that the number of patients having `children`, `Govt_job` types of work are pretty much the same and the number of patients who are self-employed are a little more. The number of patients who have never worked is only 17 and is the least. The number of patients who have private jobs is the largest (2047). Thus, `step_zv()` or `step_nzv()` might need to be applied to this variable in creating the recipe for later modeling.
 
-#### `gender` and `stroke`
+#### Relation between `gender` and `stroke`
+
+We learned from previous readings of academic paper that the risk for stroke might differ for individuals of different gender group. Thus, we explored this relation using the training data. 
 ```{r}
 ggplot(stroke_train, aes(x = stroke, fill = gender)) + 
   geom_bar(position = "fill") + 
@@ -370,7 +392,12 @@ ggplot(stroke_train, aes(x = stroke, fill = gender)) +
 
 The graph shows that the proportion of male having stroke is larger than the proportion of male not having stroke and the proportion of female having stroke is smaller than proportion of female not having stroke. The proportion of male having stroke is larger than female having stroke.
 
-#### `ever_married` and `stroke`
+#### `stroke` and Marital & Work Status 
+
+We also explored the relation between the outcome variable `stroke` and the marital and work status of an individual.
+
+##### `ever_married` and `stroke`
+
 ```{r}
 ggplot(stroke_train, aes(x = stroke, fill = ever_married)) +
    geom_bar(position = "fill") +
@@ -382,9 +409,9 @@ ggplot(stroke_train, aes(x = stroke, fill = ever_married)) +
 ```
 <br>
 
-The graph shows that the proportion of patients ever married having stroke is much higher than the proportion of patients not ever married. However, the proportion of patients ever married having stroke is  higher than the proportion of patients not ever married. It might be caused by many patients have married before. Nevertheless, the huge difference between patients ever married and not ever married having stroke indicates a potential correlation between `ever_married` and `stroke`.
+The graph shows that the proportion of patients ever married having stroke is much higher than the proportion of patients not ever married. However, the proportion of patients ever married having stroke is higher than the proportion of patients not ever married. It might be caused by many patients have married before. Nevertheless, the huge difference between patients ever married and not ever married having stroke indicates a potential correlation between `ever_married` and `stroke`.
 
-#### `work_type` and `stroke`
+##### `work_type` and `stroke`
 ```{r}
 stroke_train_wt <- stroke_train %>%
    group_by(stroke) %>% 
@@ -403,61 +430,50 @@ stroke_train_wt <- stroke_train %>%
 
 By computing each work type proportion, the graph shows that private work type has the largest proportion in both having and not having stroke. children work type has the smallest proportion in having stroke and the third largest proportion in not having stroke. There is no people having stroke who have never worked before and there is only a tiny portion of people not having stroke who have never worked before. 
 
-#### `smoking_status` and `stroke`
-```{r}
-stroke_st <- stroke_train %>%
-   group_by(stroke) %>% 
-   count(smoking_status) %>% 
-   mutate(st_prop = n / sum(n))
- 
- ggplot(stroke_st, aes(x = stroke, y = st_prop, fill = smoking_status)) +
-   geom_col(position = "dodge") +
-   labs(
-     x = "whether to have stroke",
-     y = "proportion",
-     title = "The relationship between whether to have stroke and patient smoking status"
-   )
-```
-<br>
-
-By calculating the proportion of people's smoking status in each group, the graph indicates that the proportion of people who never smoked is the largest in both people having stroke and not having stroke. Moreover, the proportion of people who have never smoked is larger for people not having stroke than having stroke. The proportion of people who have formerly smoked in having stroke is much higher than in not having stroke. The proportion of people who smokes in having stroke is a little more than in not having stroke. Finally, the proportion of people whose smoking status is unknown has the second largest proportion in not having stroke which will add some difficulty in our understanding. 
-
-#### `work_type` and `ever_married`
-```{r}
-stroke_mw <- stroke_train %>%
-   group_by(work_type) %>% 
-   count(ever_married) %>% 
-   mutate(m_prop = n / sum(n))
- 
- ggplot(stroke_mw, aes(x = work_type, y = m_prop, fill = ever_married)) +
-   geom_col(position = "dodge") +
-   labs(
-     x = "work_type",
-     y = "proportion",
-     title = "The relationship between patient work type\nand whether patient has ever married"
-   )
-```
-<br>
-
-We also want to look into the potential relationship between patient work type and whether patient has never married. Then, we observe that patients in children work type and who have never worked have never married before. All the other work types including government-related jobs, private jobs, self-employed have higher proportion in people who have married than who have never married. Therefore, it gives us somewhat strong correlation between `work_type` and `ever_married`.
-
-
-
 
 ## Secondary Findings
-#### `residence_type` and `stroke`
-```{r}
-ggplot(stroke_train, aes(x = stroke, fill = residence_type)) +
-   geom_bar(position = "fill") +
-   labs(
-     x = "whether to have stroke",
-     y = "frequency",
-     title = "The relationship between whether to have stroke and patient residence type"
-   )
-```
-The graph shows that there is basically no difference between whether patient lives and whether they have stroke. Therefore, we can potentially eliminate this variable out of our predictive model.
 
-#### `smoking_status` and `gender`
+### Distribution of `residence_type`
+
+We plotted the distribution of `residence_type` to check for class imbalance. 
+```{r}
+ggplot(stroke_train, aes(x = residence_type)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of residence_type"
+  ) +
+  theme_minimal()
+```
+<br>
+
+As shown, there is no severe class imbalance in the distribution of `residence_type` in the training set. The number of patients staying in urban area and rural area is pretty close with more around 80 individuals more living in urban area.
+
+### `residence_type` and `stroke`
+
+We also explored the relation between `residence_type` and the outcome variable `stroke`:
+```{r}
+ggplot(stroke_train, aes(x = stroke, fill = residence_type)) + 
+  geom_bar(position = "fill") + 
+  labs(
+    x = "whether to have stroke",
+    y = "frequency",
+    title = "The relationship between whether to have stroke and patient residence type", 
+    fill = "Residence Type"
+  )
+```
+<br>
+The graph shows that there is basically no difference between whether patient lives and whether they have stroke, with people living urban area has a slightly higher chance of getting stroke. 
+
+### `smoking_status` and `gender`
+
+We also plotted to see the proportions of people's smoking status in each gender: 
 ```{r}
 stroke_stg <- stroke_train %>%
    group_by(gender) %>% 
@@ -472,9 +488,12 @@ stroke_stg <- stroke_train %>%
      title = "The relationship between patient gender and smoking status"
    )
 ```
-Then, we find out proportions of people's smoking status in each gender and the graph doesn't show an obvious correlation between gender and each group of smoking_status. It can be noticed that the proportion of female who never smoked is higher than the proportion of male who never smoked. It is also worth noting that Other gender has formerly smoked because there is only one person whose gender is Other. 
+<br>
+the graph doesn't show an obvious correlation between gender and each group of smoking_status. It can be noticed that the proportion of female who never smoked is higher than the proportion of male who never smoked. It is also worth noting that Other gender has formerly smoked because there is only one person whose gender is Other. 
 
 #### `work_type` and `residence_type`
+
+In common knowledge, residence type is associated with the type of job of an individual. Thus, we computes proportions of residence type in each work type to explore this potential relation: 
 ```{r}
  stroke_wtr <- stroke_train %>%
    group_by(work_type) %>% 
@@ -489,20 +508,16 @@ Then, we find out proportions of people's smoking status in each gender and the 
      title = "The relationship between patient work type and residence type"
    )
 ```
-We also compute proportions of residence type in each work type and it can be seen that there is no strong correlation between whether patient lives and its work type. The only obvious difference is that the proportion of patients who has never worked living in urban area is much higher than living in rural area.
+<br>
 
-<<<<<<< HEAD
+It can be seen that there is no strong correlation between whether patient lives and its work type. The only obvious difference is that the proportion of patients who has never worked living in urban area is much higher than living in rural area.
 
-#### Relation between `stroke` and `avg_glucose_level`
+### Relation between `stroke` and `avg_glucose_level`
 
-According to common understandings, the risk for stroke is often associated with the average glucose level of an indivual. Thus, we chose to explore the relation between the outcome variable `strok` and `avg_glucose_level` using the boxplot below: 
+According to common understandings, the risk for stroke is often associated with the average glucose level of an indivual. Thus, we chose to explore the relation between the outcome variable `stroke` and `avg_glucose_level` using the boxplot below: 
 
-=======
-#### `age` and `bmi`
-Among the relations between the numeric predictors, the correlation between age and bmi seems to be the strongest (most positive). Thus, we plotted the relation between `age` and `bmi` below: 
->>>>>>> a78639abc4fb18248797d564f7898ca053f63513
 ```{r}
-# relation between `age` and `stroke`
+# relation between `avg_glucose_level` and `stroke`
 ggplot(stroke_train, aes(avg_glucose_level, stroke)) + 
   geom_boxplot() + 
   labs(
@@ -515,6 +530,16 @@ ggplot(stroke_train, aes(avg_glucose_level, stroke)) +
 
 As shown, for observations with value `Yes` for `stroke` the interquantile range for the distribution of the average glucose level is much wider than the distribution of the average glucose level for level `No` of the `stroke`. Also, the median average glucose level for observations with `stroke` value `Yes` is larger than the the median average glucose level for observations with `stroke` value `No`. The distribution of average glucose level values is also more right-skewed for observations with `stroke` value `No`. For observations with `stroke` value `No`, average glucose level above around 180 are considered as outliers. We can infer from the plot that, for the sample population used for collecting this data, individuals with average glucose level above 125 are more likely to get stroke.
 
-
-
 ## Conclusion and Implications
+
+In the EDA section of our final project, we explored the distribution of the outcome variable `stroke` and the distribution of several important categorical and numeric variables using the training set of the tidied `stroke_data`. We also explored the correlation between the outcome and the predictors and the correlation between important predictors.
+
+The analysis of missingness indicate that only one variable `bmi` contains missing values. Since the degree of missingness is very low, we plan to use bagged tree imputation on this variable in creating the recipe. 
+
+One important finding is the severe class imbalance in the outcome variable `stroke` after stratified sampling. The class imbalance is also observed in variable `ever_married`. If encountering problem in the later resampling and cross-validation process, we might need to consider using random over-sampling or under-sampling. 
+
+Moreover, there is no strong linear correlation between any pair of numeric predictors, suggesting that there is no problem with near-perfect collinearity. Numeric predictors `avg_glucose_level` and `age` are found to be closely related to `stroke`. The results suggest that, for the sample population among which the data was obtained, individuals with average glucose level above 125 and age above 60 have higher risk for getting stroke. 
+
+Thirdly, extreme right-skewness is observed in the distributions of `avg_glucose_level` and `bmi`, suggesting the need to use log-transformation in creating the recipe. 
+
+Lastly, less occurring levels are observed in categorical predictors `gender`, `smoking_status`, and `work_type`, suggesting the need to use `step_zv()` and `step_nzv()` in creating the recipe. 
