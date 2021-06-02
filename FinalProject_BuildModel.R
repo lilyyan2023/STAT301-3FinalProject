@@ -14,9 +14,9 @@ stroke_test <- testing(stroke_split)
 stroke_recipe <- recipe(stroke ~ ., data = stroke_train) %>% 
   step_impute_bag(bmi) %>% # bag impute bmi missing values
   step_log(avg_glucose_level, bmi) %>% 
+  step_interact(bmi ~ age) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) %>% 
-  step_interact(bmi ~ age) %>% # interact bmi and age
   step_normalize(all_predictors())
 
 prep(stroke_recipe) %>% 
