@@ -41,8 +41,9 @@ rf_grid <- grid_regular(rf_params, levels = 5)
 # Workflow
 rf_workflow <- workflow() %>% 
   add_model(rf_model) %>% 
-  add_recipe(wildfires_recipe2)
+  add_recipe(stroke_recipe)
 
+# en, knn, svm
 
 
 
