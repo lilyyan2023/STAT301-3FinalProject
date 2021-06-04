@@ -56,8 +56,11 @@ prep(stroke_recipe_over_sampling_1) %>%
 prep(stroke_recipe_over_sampling_2) %>% 
   bake(new_data = NULL)
 
+## NOTE: the upper bound for `mtry` is 15
+
 # save setup ----
-save(stroke_recipe_orig, stroke_train, stroke_test, stroke_folds, 
+save(stroke_recipe_orig, stroke_recipe_over_sampling_1,
+     stroke_recipe_over_sampling_2, stroke_train, stroke_test, stroke_folds, 
      stroke_data, file = "data/stroke_setup.rda")
 
 
