@@ -1,0 +1,902 @@
+---
+title: "Stat 301-3 Final Project Long Report"
+author: "XI KANG, Mingze Yan"
+date: "6/6/2021"
+output:
+  html_document: 
+    code_folding: hide
+    toc: true
+    toc_float: true
+    highlight: "tango"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,  message = FALSE, warning = FALSE)
+```
+
+```{r load-packages-set-seed}
+## Load Packages, Set Seed
+library(tidyverse)
+library(tidymodels)
+library(skimr)
+library(naniar)
+library(kableExtra)
+library(corrplot)
+library(corrr)
+library(tictoc)
+library(themis)
+set.seed(123)
+```
+
+## Introduction
+
+This is the final project Stat 301-3 final project. The goal of this project is to predict one's risk for stroke through a classification approach. <br>
+
+Based on the information from the [World Health Organization (WHO)](https://dx.doi.org/10.2471/BLT.16.181636), stroke is the second leading cause of death and the third leading cause for disability. Nevertheless, effective prevention actions can be applied to reduce the fatal effects of this medical emergency and lower the risk for mortality and disability. Thus, to provide targeted support and effective prevention strategies, it is crucial to identify the risks for stroke based on common factors related to one's lifestyle or chronic health conditions. <br>
+
+Thus, driven by the incentives mentioned above, our project focuses on predicting the risk for stroke based on input parameters about one's lifestyle and health status. The research question of this project is a predictive classification question. <br>
+
+This long report contains two main sections the Exploratory Data Analysis (EDA) section tidies the dataset, explores the distributions of important variables, and identifies significant patterns to obtain insights that faciliate the later modeling process. The predictive modeling section builds, tunes, and assesses the performance of different models in predicting one's risk of stroke based on input parameters.
+
+## Exploratory Data Analysis (EDA)
+
+### Data Source
+
+The dataset used by this project is the "Stroke Prediction Dataset" provided on [Kaggle](https://www.kaggle.com/fedesoriano/stroke-prediction-dataset). We first loaded in the raw dataset and cleaned the names. The initial data tidying process it completed in the FinalProject_tidy_data.r file. The code used is presented below:
+
+```{r tidy-data, eval=FALSE}
+## Load raw dataset ----
+stroke_dat <- 
+  read_csv("data/unprocessed/healthcare-dataset-stroke-data.csv") %>% 
+  clean_names() %>% 
+  mutate(
+    gender = factor(gender), 
+    ever_married = factor(ever_married),
+    work_type = factor(work_type),
+    residence_type = factor(residence_type),
+    smoking_status = factor(smoking_status),
+    stroke = factor(stroke, levels = c(1, 0), 
+                    labels = c("Yes", "No")),
+    hypertension = factor(hypertension, levels = c(1, 0), 
+                          labels = c("Yes", "No")), 
+    heart_disease = factor(heart_disease, levels = c(1, 0), 
+                           labels = c("Yes", "No")), 
+    bmi = as.numeric(bmi)
+  ) %>% 
+  select(-id)
+
+## initial skimming ----
+skim_without_charts(stroke_dat)
+
+## save processed data ----
+stroke_dat %>% 
+  write_rds("data/processed/stroke_data.rds")
+```
+
+<br>
+
+### Dataset Overview
+
+Using methods from `skimr`, we noticed that the original dataset contains 5110 rows and 12 columns. For the convenience of the later processes, we first turned the categorical variables `gender`, `ever_married`, `work_type`, `residence_type`, and `smoking_status` into factors. The outcome variable `stroke` and variables `hypertension` and `heart_disease` were initially identified as numeric variables, but they should be categorical. Thus, we turned them into a factors. Since `id` will not be used as a categorical variable, we removed it from the original dataset. <br>
+
+After initial tidying, we loaded in the processed data and performed a train-test split, stratified by the outcome variable `stroke`. We used 70% of the data for training and 30% for testing:
+
+```{r, load-data-and-split}
+stroke_data <- readRDS("data/processed/stroke_data.rds")
+
+## split data ----
+stroke_split <- initial_split(stroke_data, prop = 0.7, strata = stroke)
+stroke_train <- training(stroke_split)
+stroke_test <- testing(stroke_split)
+```
+
+<br>
+
+The EDA section will be performed using the training set data, `stroke_train`. <br>
+
+After the split, we first obtained an overview on the training set using the methods from the `skimr` package. We noticed that the training set contains 11 variables, and 3577 observations. Among them 8 variables are factors and 3 variables are numeric. The outcome variable `stroke` is a categorical variable of type factor. <br>
+
+### Missing Data
+
+During the initial skimming, we noticed that only one variable `bmi` contains missing values. To obtain a wholistic overview on the general situation of missingness in the training data, we created a plot showing the amount of missing data in each column using the `vis_miss()` function from `naniar`:
+
+```{r, fig.height = 7, fig.width = 7}
+# overview of missingness
+stroke_train %>% 
+  vis_miss(sort_miss = TRUE)
+```
+
+<br>
+
+As shown, within the 11 columns in the dataset, there is only column `bmi` with missing data. The response variable `stroke` does not have any missing values. To clearly present the percentage of missingness for each variable, we created the table below using `miss_var_summary()`, and we highlighted the rows for the variable with missing value in blue:
+
+```{r}
+# overview table
+stroke_train %>% 
+  miss_var_summary() %>% 
+  kbl() %>% 
+  kable_classic() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover")) %>% 
+  row_spec(1, color = "white",
+           background = "blue") %>% 
+  kableExtra::footnote(
+    general = "Number and Percentage of Missing Values in Each Variable"
+  )
+```
+
+<br>
+
+As shown, `bmi` is the only variable with missing values and its percentage of missingness is about 4%. Since the degree of missingness is very low, we plan to impute `bmi` using bagged tree imputation. <br>
+
+### Essential Findings
+
+#### Outcome variable
+
+We first performed a univariate investigation of the response variable `stroke`. The barchart below provides an overview on the distribution of `stroke` in the training set:
+
+```{r outcome-var-plot, fig.height= 7, fig.width=7}
+# plot
+stroke_train %>%
+  ggplot(aes(stroke, fill = stroke)) + 
+  geom_bar(show.legend = FALSE) + 
+  labs(
+    x = "Stroke", 
+    y = "Number of Observations", 
+    title = "Distribution of Response Variable"
+  ) + 
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25
+  )
+```
+
+<br>
+
+As shown above, even though we stratified by the outcome variable `stroke` when performing data splitting, there is still severe class imbalance in the outcome variable. There are 180 observations in level `Yes` and 3397 observations in level `No`. Depending on the plans for resampling, we might need to consider using over-sampling or under-sampling to avoid errors in the resampling and cross-validation process. Further decisions will be made after consulting the professors and TAs. <br>
+
+#### Correlation among Numeric Predictors
+
+We used a correlation plot to explore the correlation among numeric predictors. Since the degree of missingness is very low for `bmi` we temporarily dropped the `NA` in plotting to avoid errors.
+
+```{r, fig.height= 8, fig.width=8}
+# correlation plot
+stroke_train %>% 
+  select(age, avg_glucose_level, bmi) %>% 
+  
+  drop_na() %>% 
+  # compute correlation matrix
+  cor() %>% 
+  # visualize
+  corrplot(type = "upper", 
+           title = "Correlations between Numeric Variables", 
+           mar = c(0, 0, 1, 0))
+```
+
+<br>
+
+As shown, there is no near-perfect collinearity between any pair of number predictors. All three variables are positively related to each other. A table showing the correlation between the numeric predictors is also presented below:
+
+```{r}
+# correlation between predictors
+stroke_train %>% 
+  select(age, avg_glucose_level, bmi) %>% 
+  drop_na() %>% 
+  # compute correlation matrix
+  correlate() %>% 
+  # turn into a tibble
+  stretch() %>% 
+  rename("correlation" = "r") %>% 
+  arrange(desc(correlation)) %>%
+  # temporary var `row_id` to help removing repeated info
+  mutate(row_id = row_number()) %>% 
+  # filter out even rows
+  drop_na() %>% 
+  filter(row_id %% 2 == 0) %>% 
+  # remove temporary var
+  select(-row_id) %>%
+  kbl() %>% 
+  kable_classic()
+```
+
+<br>
+
+As shown, the highest correlation coefficient is between variables `bmi` and `age`, which is 0.3461315. The table comfirms that there is no strong linear correlation between the numeric predictors. <br>
+
+#### `age` predictor
+
+In common knowledge, age is often closely related to one's risk for stroke. Also, knowing the distribution of variable `age` in this dataset can help us understand the age range of population for which the result of this project is applicable. Thus, we plotted the distribution of `age` in the training set:
+
+```{r}
+# distribution of age
+ggplot(stroke_train, aes(age)) + 
+  geom_histogram(binwidth = 1) + 
+  labs(
+    x = "age", 
+    y = "number of observations", 
+    title = "Distribution of `age` in the Training Set"
+  )
+```
+
+<br>
+
+As shown, the distribution of `age` is about normal. Also, the observations range from 0 to 80-year old without any gaps in between. There are two abrupt peaks: one slightly below 10 and one slightly above 75, suggesting that there are more observations with these two age values. However, no obvious outliers are observed. <br>
+
+We then explored the relation between `age` and the outcome variable `stroke` using the boxplot below:
+
+```{r}
+# relation between `age` and `stroke`
+ggplot(stroke_train, aes(age, stroke)) + 
+  geom_boxplot() + 
+  labs(
+     x = "Age",
+     y = "Stroke",
+     title = "The relationship between whether to have stroke and age"
+  )
+```
+
+<br>
+
+As shown, there is a clear correlation between age and an individual's chance of getting stroke. In the training set, almost all observations with value `Yes` for `stroke` have age above 35, with the exception of one outlier at around 17. Also, the median for the `age` value for observations with `No` for `stroke` is just above 40, much lower than the median for the observations with `Yes` for `stroke` (above 70). It can be implied that, in the dataset used, individuals who had stroke tend to be older in age.
+
+#### Relation between `age` and `heart_disease`
+
+Age is often considered as an important factor determing one's risk for heart disease. Thus, we used boxplot to explore the relation between `age` and `heart_disease` in the training set:
+
+```{r}
+# relation between `age` and `heart_disease`
+ggplot(stroke_train, aes(age, heart_disease)) + 
+  geom_boxplot() + 
+  labs(
+     x = "Age",
+     y = "Heart Disease",
+     title = "The relationship between whether to have heart disease and age"
+  )
+```
+
+<br>
+
+As shown, the distribution of `age` is severely left-skewed for `heart_disease` with level `Yes`. This visualization suggests the correlation between `heart_disease` and `age`. Among the sample population from which the data was obtained, individual older in age are more likely to get heart disease.
+
+#### Skewness in `avg_glucose_level` and `bmi`
+
+We also explored the distribution of `avg_glucose_level` and `bmi` in the training set:
+
+```{r}
+# distribution of avg_glucose_level
+ggplot(stroke_train, aes(avg_glucose_level)) + 
+  geom_histogram(binwidth = 5) + 
+  labs(
+    x = "Average Glucose Level", 
+    y = "number of observations", 
+    title = "Distribution of `avg_glucose_level` in the Training Set"
+  )
+```
+
+<br>
+
+As shown, the distribution of `avg_glucose_level` is severely right-skewed. With the number of observations decreasing abruptly above 110. This result suggests that there are fewer observations with `avg_glucose_level` above 110. This result makes sense, considering the online resources suggest that a normal blood glucose level ranges from 80 to 140. An blood glucose level in the range 140-200 should be considered as pre-diabetes. Thus, we can imply from the plot that,in the training set, there are more observations with normal blood sugar level than observations with pre-diabetes conditions. <br>
+
+```{r}
+# distribution of bmi
+ggplot(stroke_train, aes(bmi)) + 
+  geom_histogram(binwidth = 1) + 
+  labs(
+    x = "BMI (Body Mass Index)", 
+    y = "number of observations", 
+    title = "Distribution of `bmi` in the Training Set"
+  )
+```
+
+<br>
+
+As shown, the distribution of `bmi` in the training set is also severly right-skewed. There are near-zero observations for `bmi` values above 50 and values below 10. From online resources, we learned that the normal range for BMI value is 18.5 to 25. BMI values less than 18.5 suggest underweight. Values from 25.0 to 30 suggests overweight range, and BMI above 30 suggests obesity. Thus, it makes sense for the distribution of `bmi` values to peak around the range from 25 to 30. <br>
+
+Based on the observed skewness, we decided to log-transform variables `avg_glucose_level` and `bmi` in creating the recipes later. <br>
+
+#### Class Imbalance in `ever_married`
+
+In exploring the categorical predictors, we noticed that there is class imbalance in the distributions of `ever_married`.
+
+```{r}
+ggplot(stroke_train, aes(x = ever_married)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of ever_married"
+  ) +
+  theme_minimal()
+```
+
+<br> As shown, there are approximately 1100 more patients having married before. If encountering problem in resampling and cross-validation, we might need to consider using random under-sampling or over-sampling.
+
+#### Less Occurring Values
+
+Observing the distribution of the multi-level categorical variables, we noticed that some variables have severely less occuring values that might cause problems in the later modeling process. Specific recipe steps will be applied based on the situation.
+
+##### Distribution of `gender`
+
+```{r}
+ggplot(stroke_train, aes(x = gender)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of gender"
+  ) +
+  theme_minimal()
+```
+
+<br>
+
+The distribution of gender shows that there are around 600 more female patients in the training data than male ones and only one patient classifying itself as `Other` gender. To avoid problem caused by less occuring values, `step_zv()` will be applied in creating the recipe.
+
+##### Distribution of `smoking_status`
+
+There is also obvious difference in the number of observations in each level or variable `smoking_status`:
+
+```{r}
+ggplot(stroke_train, aes(x = smoking_status)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of smoking_status"
+  ) +
+  theme_minimal()
+```
+
+<br>
+
+As shown by the plot, patients having never smoked are the largest (1333) and patients who have unknown smoking status are the second largest (1081). Patients who smoke and formerly smoked are only 55 apart and there is no huge difference between these two types of patients.
+
+##### Distribution of `work_type`
+
+```{r}
+ggplot(stroke_train, aes(x = work_type)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of work_type"
+  ) +
+  theme_minimal()
+```
+
+<br>
+
+The graph shows that the number of patients having `children`, `Govt_job` types of work are pretty much the same and the number of patients who are self-employed are a little more. The number of patients who have never worked is only 17 and is the least. The number of patients who have private jobs is the largest (2047). Thus, `step_zv()` or `step_nzv()` might need to be applied to this variable in creating the recipe for later modeling.
+
+#### Relation between `gender` and `stroke`
+
+We learned from previous readings of academic paper that the risk for stroke might differ for individuals of different gender group. Thus, we explored this relation using the training data.
+
+```{r}
+ggplot(stroke_train, aes(x = stroke, fill = gender)) + 
+  geom_bar(position = "fill") + 
+  labs(
+     x = "whether to have stroke",
+     y = "frequency",
+     title = "The relationship between whether to have stroke and gender"
+  )
+```
+
+<br>
+
+The graph shows that the proportion of male having stroke is larger than the proportion of male not having stroke and the proportion of female having stroke is smaller than proportion of female not having stroke. The proportion of male having stroke is larger than female having stroke.
+
+#### `stroke` and Marital & Work Status
+
+We also explored the relation between the outcome variable `stroke` and the marital and work status of an individual.
+
+##### `ever_married` and `stroke`
+
+```{r}
+ggplot(stroke_train, aes(x = stroke, fill = ever_married)) +
+   geom_bar(position = "fill") +
+   labs(
+     x = "whether to have stroke",
+     y = "frequency",
+     title = "The relationship between whether to have stroke and whether ever married"
+   )
+```
+
+<br>
+
+The graph shows that the proportion of patients ever married having stroke is much higher than the proportion of patients not ever married. However, the proportion of patients ever married having stroke is higher than the proportion of patients not ever married. It might be caused by many patients have married before. Nevertheless, the huge difference between patients ever married and not ever married having stroke indicates a potential correlation between `ever_married` and `stroke`.
+
+##### `work_type` and `stroke`
+
+```{r}
+stroke_train_wt <- stroke_train %>%
+   group_by(stroke) %>% 
+   count(work_type) %>% 
+   mutate(wt_prop = n / sum(n))
+ 
+ ggplot(stroke_train_wt, aes(x = stroke, y = wt_prop, fill = work_type)) +
+   geom_col(position = "dodge") +
+   labs(
+     x = "whether to have stroke",
+     y = "proportion",
+     title = "The relationship between whether to have stroke and patient work type"
+   )
+```
+
+<br>
+
+By computing each work type proportion, the graph shows that private work type has the largest proportion in both having and not having stroke. children work type has the smallest proportion in having stroke and the third largest proportion in not having stroke. There is no people having stroke who have never worked before and there is only a tiny portion of people not having stroke who have never worked before.
+
+### Secondary Findings
+
+#### Distribution of `residence_type`
+
+We plotted the distribution of `residence_type` to check for class imbalance.
+
+```{r}
+ggplot(stroke_train, aes(x = residence_type)) +
+  geom_bar() +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    hjust = 0.5
+  ) +
+  labs(
+    title = "Distribution of residence_type"
+  ) +
+  theme_minimal()
+```
+
+<br>
+
+As shown, there is no severe class imbalance in the distribution of `residence_type` in the training set. The number of patients staying in urban area and rural area is pretty close with more around 80 individuals more living in urban area.
+
+#### `residence_type` and `stroke`
+
+We also explored the relation between `residence_type` and the outcome variable `stroke`:
+
+```{r}
+ggplot(stroke_train, aes(x = stroke, fill = residence_type)) + 
+  geom_bar(position = "fill") + 
+  labs(
+    x = "whether to have stroke",
+    y = "frequency",
+    title = "The relationship between whether to have stroke and patient residence type", 
+    fill = "Residence Type"
+  )
+```
+
+<br> The graph shows that there is basically no difference between whether patient lives and whether they have stroke, with people living urban area has a slightly higher chance of getting stroke.
+
+#### `smoking_status` and `gender`
+
+We also plotted to see the proportions of people's smoking status in each gender:
+
+```{r}
+stroke_stg <- stroke_train %>%
+   group_by(gender) %>% 
+   count(smoking_status) %>% 
+   mutate(st_prop = n / sum(n))
+ 
+ ggplot(stroke_stg, aes(x = gender, y = st_prop, fill = smoking_status)) +
+   geom_col(position = "dodge") +
+   labs(
+     x = "gender",
+     y = "proportion",
+     title = "The relationship between patient gender and smoking status"
+   )
+```
+
+<br> the graph doesn't show an obvious correlation between gender and each group of smoking_status. It can be noticed that the proportion of female who never smoked is higher than the proportion of male who never smoked. It is also worth noting that Other gender has formerly smoked because there is only one person whose gender is Other.
+
+#### `work_type` and `residence_type`
+
+In common knowledge, residence type is associated with the type of job of an individual. Thus, we computes proportions of residence type in each work type to explore this potential relation:
+
+```{r}
+ stroke_wtr <- stroke_train %>%
+   group_by(work_type) %>% 
+   count(residence_type) %>% 
+   mutate(rt_prop = n / sum(n))
+ 
+ ggplot(stroke_wtr, aes(x = work_type, y = rt_prop, fill = residence_type)) +
+   geom_col(position = "dodge") +
+   labs(
+     x = "work_type",
+     y = "proportion",
+     title = "The relationship between patient work type and residence type"
+   )
+```
+
+<br>
+
+It can be seen that there is no strong correlation between whether patient lives and its work type. The only obvious difference is that the proportion of patients who has never worked living in urban area is much higher than living in rural area.
+
+#### Relation between `stroke` and `avg_glucose_level`
+
+According to common understandings, the risk for stroke is often associated with the average glucose level of an indivual. Thus, we chose to explore the relation between the outcome variable `stroke` and `avg_glucose_level` using the boxplot below:
+
+```{r}
+# relation between `avg_glucose_level` and `stroke`
+ggplot(stroke_train, aes(avg_glucose_level, stroke)) + 
+  geom_boxplot() + 
+  labs(
+     x = "Average Glucose Level",
+     y = "Stroke",
+     title = "The relationship between stroke and average glucose level"
+  )
+```
+
+<br>
+
+As shown, for observations with value `Yes` for `stroke` the interquantile range for the distribution of the average glucose level is much wider than the distribution of the average glucose level for level `No` of the `stroke`. Also, the median average glucose level for observations with `stroke` value `Yes` is larger than the the median average glucose level for observations with `stroke` value `No`. The distribution of average glucose level values is also more right-skewed for observations with `stroke` value `No`. For observations with `stroke` value `No`, average glucose level above around 180 are considered as outliers. We can infer from the plot that, for the sample population used for collecting this data, individuals with average glucose level above 125 are more likely to get stroke.
+
+### EDA Section Conclusion and Implications for Modeling
+
+In the EDA section of our final project, we explored the distribution of the outcome variable `stroke` and the distribution of several important categorical and numeric variables using the training set of the tidied `stroke_data`. We also explored the correlation between the outcome and the predictors and the correlation between important predictors.
+
+The analysis of missingness indicate that only one variable `bmi` contains missing values. Since the degree of missingness is very low, we plan to use kNN imputation on this variable in creating the recipe.
+
+One important finding is the severe class imbalance in the outcome variable `stroke` after stratified sampling. After consulting the instructional team, we decided to apply random over-sampling on this variable by including `step_upsample()` as one of our recipe steps. We also included a recipe without over-sampling for comparison purpose.
+
+Due to the observed extreme right-skewness in the distributions of `avg_glucose_level` and `bmi`, we decided to log-transform these variables in creating the recipe.
+
+Lastly, since there are less occurring levels in categorical predictors `gender`, `smoking_status`, and `work_type`, we decided to use `step_zv()` in creating the recipe.
+
+## Predictive Modeling
+
+### Predictive Goal and Models of Interest
+
+The goal of the prediction is classification, and the outcome variable is `stroke`, a categorical variable indicating whether or not the individual has stroke. Due to the severe class imbalance of the outcome variable observed in EDA, we decided to evaluate model performance based on the ROC-AUC metric. 
+<br>
+
+**Six candidate models** were trained and tuned:
+
+1.  Elastic Net
+    - parameters `mixture` and `penalty` are tuned
+    
+2.  Nearest neighbors
+    - the number of neighbors is tuned
+
+3.  Random forest
+    - parameters `mtry` and `min_n` are tuned
+
+4.  Boosted tree
+    - parameters `mtry`, `min_n`, and `learn_rate` are tuned
+
+5.  Support vector machine (polynomial)
+    - `cost`, `degree`, and `scale_factor` are tuned
+
+6.  Multivariate adaptive regression splines (MARS)
+    - parameter `num_terms` is tuned
+
+<br>
+
+### Load Setup and Results
+
+```{r load-modeling-setup-and-results}
+# Load setup
+load("data/stroke_setup.rda")
+
+# load result
+load("bt_tune_orig_recipe.rda")
+load("en_tune_orig_recipe.rda")
+load("knn_tune_orig_recipe.rda")
+load("rf_tune_orig_recipe.rda")
+load("svmp_tune_orig_recipe.rda")
+load("mars_tune_orig_recipe.rda")
+load("bt_tune_upsample_recipe1.rda")
+load("en_tune_upsample_recipe1.rda")
+load("knn_tune_upsample_recipe1.rda")
+load("rf_tune_upsample_recipe1.rda")
+load("svmp_tune_upsample_recipe1.rda")
+load("mars_tune_upsample_recipe1.rda")
+```
+<br>
+
+We split the data into 70% training and 30% testing using stratified sampling on `stroke`. Then we used V-fold cross-validation with 5 folds, repeated 3 times, to fold the **training** data, we also applied stratification on the outcome variable in the cross-validation process. The code for splitting and resampling is shown below. 
+```{r splitting-cross-validation, eval= FALSE}
+# Split data ----
+stroke_split <- initial_split(stroke_data, prop = 0.7, strata = stroke)
+stroke_train <- training(stroke_split)
+stroke_test <- testing(stroke_split)
+
+## Cross-Validation ----
+stroke_folds <- 
+  vfold_cv(data = stroke_train, v = 5, repeats = 3, strata = stroke)
+```
+<br>
+
+### Model Performance Comparison
+
+We tuned all six models on two different recipes. The difference between the recipes is that one recipe applied random over-sampling on the outcome variable `stroke`, with `over_ratio` set to 0.2. The reason for choosing 0.2 for this parameter over its default value 1 is that the difference between the two classes of `stroke` is extremely large. As shown by the visualization in the "Outcome variable" subsection of the EDA section. While there are 3403 observations with value `No` in the training set, there are only 174 observations with value `Yes`. 
+<br>
+
+Since the `over_ratio` parameter is a numeric value for the ratio of the majority-to-minority frequencies. The default value 1 means that less occurring level (`Yes`) will be sampled up to have the same frequency as the most occurring level(`No`). However, if we use `over_ratio` set to 1, we will generate over 3000 observations by replicating rows of the original dataset to make the factor levels have equal frequencies. Thus, driven by the concern that "manually" replicating too many might have a negative impact on the model performance, we choose an `over_ratio` value of 0.2. The original recipe without the upsampling step and the recipe with the upsampling step are shown below: 
+```{r recipes, eval=FALSE}
+# Build recipe ----
+# original recipe - no over-sampling
+stroke_recipe_orig <- recipe(stroke ~ ., data = stroke_train) %>% 
+  step_impute_bag(bmi) %>% # bag impute bmi missing values
+  step_log(avg_glucose_level, bmi) %>% 
+  step_interact(bmi ~ age) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+
+# recipe with 0.2 ratio over-sampling
+stroke_recipe_over_sampling_1 <- recipe(stroke ~ ., data = stroke_train) %>% 
+  # over-sampling, 0.2 ratio
+  step_upsample(stroke, over_ratio = 0.2) %>%
+  step_impute_bag(bmi) %>% # bag impute bmi missing values
+  step_log(avg_glucose_level, bmi) %>% 
+  step_interact(bmi ~ age) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+```
+<br>
+
+We tuned the models in separate R-script files. The tables below compares the tuning results cross models and cross recipes. The two main goals for the comparison are to find the best model and to explore the impact of over-sampling on model performance. 
+
+#### Optimal Model Performance
+
+The tables showing the best performing model using the original recipe and the recipe with upsampling step are presented below:
+
+##### Original Recipe
+
+```{r result-tibble-orig}
+# result tibble
+tune_results_orig <- tibble(
+  model_type = c("Elastic Net", "K-nearest Neighbors", "Random Forest", "Boosted Tree", "SVM Polynomial", "Multivariate Adaptive Regression Splines"), 
+  tune_info = list(en_tuned, nn_tuned, rf_tuned, bt_tuned, 
+                   svmp_tuned, mars_tuned), 
+  # assess model tuning results
+  assessment_info = map(tune_info, collect_metrics), 
+  # judge models based on the accuracty metric
+  best_model = map(tune_info, ~ show_best(.x, metric = "roc_auc"))
+)
+
+# tibble for tuning performance
+tune_performance_orig <- tune_results_orig %>% 
+  select(model_type, best_model) %>% 
+  unnest(best_model) %>% 
+  group_by(model_type) %>% 
+  filter(mean == max(mean)) %>%  
+  arrange(desc(mean)) %>% 
+  select(model_type, mean, std_err)
+
+# print table
+tune_performance_orig %>% 
+  rename("ROC AUC" = mean, "Model Type" = model_type, 
+         "Standard Error" = std_err) %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  row_spec(1, color = "white",
+              background = "blue") %>% 
+  kableExtra::footnote(general = "Best Performance for 6 Candidate Models Using Original Recipe")
+```
+<br>
+
+As shown, the best performing model using the original recipe (without over-sampling) is the Elastic Net model (highlighted in blue). The mean ROC-AUC score is 0.8386933. Nevertheless, the standard deviation is 0.0065819, while the difference between the mean ROC-AUC score of the elastic net model and mean ROC-AUC score of the second best model (Boosted Tree) is only 0.0004906. Since the difference is much smaller than the standard deviation, the Elastic Net model does not show significantly better performance than the Boosted Tree model, and they show comparative performance. 
+<br>
+
+The difference between the mean ROC-AUC score of the Boosted Tree model and the third best model (Random Forest) is 0.0106813, larger than its standard deviation 0.0077664, suggesting that it shows significantly better performance. Thus, we conclude that the Elastic Net model is the best performing models using the original recipe, with mean ROC-AUC score about 0.839, while the Boosted Tree model shows comparatively good performance. 
+
+##### Upsampling Recipe
+
+ 
+```{r result-tibble-upsample1}
+# result tibble
+tune_results_upsample1 <- tibble(
+  model_type = c("Elastic Net", "K-nearest Neighbors", "Random Forest", "Boosted Tree", "SVM Polynomial", "Multivariate Adaptive Regression Splines"), 
+  tune_info = list(en_tuned_over_sampling_1, nn_tuned_over_sampling_1, rf_tuned_over_sampling_1, bt_tuned_over_sampling_1, svmp_tuned_over_sampling_1, mars_tuned_over_sampling_1), 
+  # assess model tuning results
+  assessment_info = map(tune_info, collect_metrics), 
+  # judge models based on the accuracty metric
+  best_model = map(tune_info, ~ show_best(.x, metric = "roc_auc"))
+)
+
+# tibble for tuning performance
+tune_performance_upsample1 <- tune_results_upsample1 %>% 
+  select(model_type, best_model) %>% 
+  unnest(best_model) %>% 
+  group_by(model_type) %>% 
+  filter(mean == max(mean)) %>%  
+  arrange(desc(mean)) %>% 
+  select(model_type, mean, std_err)
+
+# print table
+tune_performance_upsample1 %>% 
+  rename("ROC AUC" = mean, "Model Type" = model_type, 
+         "Standard Error" = std_err) %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  row_spec(1, color = "white",
+              background = "blue") %>% 
+  kableExtra::footnote(general = "Best Performance for 6 Candidate Models Using Upsampling Recipe")
+```
+<br>
+
+As shown, for the upsampling recipe, the best performing model is also the Elastic Net model, with mean ROC-AUC score of 0.8376819. The second best model is also the Boosted Tree model. However, for this recipe, the difference between the mean ROC-AUC score of the Elastic Net model and the second best model (Boosted Tree) is 0.0045896, smaller than its standard error, which is 0.0068808. Thus, Elastic Net model is the best performing model for the recipe with over-sampling step, and it shows significantly better performance than the second best Boosted Tree model. 
+<br>
+
+#### Impact of Over-sampling
+
+Comparing the two tables above, we noticed that, for the same model, the tuning result using the recipe with over-sampling step shows a less ideal performance than the original recipe. We organized a table comparing the performance of the two best models (Elastic Net and Boosted Tree) using different recipes for a more straight-forward illustration: 
+```{r cross-model-cross-recipe-results}
+# result tibble
+tune_results_diff_recipe <- tibble(
+  model_type = c("Elastic Net (Original Recipe)", 
+                 "Boosted Tree (Original Recipe)", 
+                 "Elastic Net (Upsampling Recipe)", 
+                 "Boosted Tree (Upsampling Recipe)"), 
+  tune_info = list(en_tuned, bt_tuned, 
+                   en_tuned_over_sampling_1, 
+                   bt_tuned_over_sampling_1), 
+  # assess model tuning results
+  assessment_info = map(tune_info, collect_metrics), 
+  # judge models based on the accuracty metric
+  best_model = map(tune_info, ~ show_best(.x, metric = "roc_auc"))
+)
+
+# tibble for tuning performance
+tune_performance_diff_recipe <- tune_results_diff_recipe %>% 
+  select(model_type, best_model) %>% 
+  unnest(best_model) %>% 
+  group_by(model_type) %>% 
+  filter(mean == max(mean)) %>%  
+  arrange(desc(mean)) %>% 
+  select(model_type, mean, std_err)
+
+# print table
+tune_performance_diff_recipe %>% 
+  rename("ROC AUC" = mean, "Model Type" = model_type, 
+         "Standard Error" = std_err) %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  row_spec(1, color = "white",
+              background = "blue") %>% 
+  kableExtra::footnote(general = "Best Performance across Different Models and Different Recipes")
+```
+<br>
+
+As shown, for both the Elastic Net model and the Boosted Tree model, the best model using the original recipe out-performs the best model using the upsampling recipe. However, the difference between the mean ROC-AUC score of different recipes of the Elastic Net model is only 0.0010114, much smaller than its standard error 0.0065819. Since this difference is not big enough to support the claim on the impact on over-sampling on model performance, we created another recipe with over-sampling step on `stroke`, and we examines the tuning results of the Elastic Net model and Boosted Tree model on this recipe. In this recipe, the `over_ratio` is set to 0.5 for comparison purpose. The recipe is shown below: 
+```{r over-sampling-recipe2, eval=FALSE}
+# recipe with 0.5 ratio over-sampling
+stroke_recipe_over_sampling_2 <- recipe(stroke ~ ., data = stroke_train) %>% 
+  # over-sampling, 0.5 ratio
+  step_upsample(stroke, over_ratio = 0.5) %>%
+  step_impute_bag(bmi) %>% # bag impute bmi missing values
+  step_log(avg_glucose_level, bmi) %>% 
+  step_interact(bmi ~ age) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+```
+<br>
+
+The results are loaded and compared with the tuning results of the Elastic Net model and the Boost Tree Model using the original and first over-sampling recipe: 
+```{r}
+# load results
+load("bt_tune_upsample_recipe2.rda")
+load("en_tune_upsample_recipe2.rda")
+
+# organize into table
+# result tibble
+tune_results_diff_recipe <- tibble(
+  model_type = c("Elastic Net (Original Recipe)", 
+                 "Boosted Tree (Original Recipe)", 
+                 "Elastic Net (Upsampling Recipe (0.2 ratio))",
+                 "Boosted Tree (Upsampling Recipe (0.2 ratio))", 
+                 "Elastic Net (Upsampling Recipe (0.5 ratio))",
+                 "Boosted Tree (Upsampling Recipe (0.5 ratio))"), 
+  tune_info = list(en_tuned, bt_tuned, 
+                   en_tuned_over_sampling_1, 
+                   bt_tuned_over_sampling_1, 
+                   en_tuned_over_sampling_2, 
+                   bt_tuned_over_sampling_2), 
+  # assess model tuning results
+  assessment_info = map(tune_info, collect_metrics), 
+  # judge models based on the accuracty metric
+  best_model = map(tune_info, ~ show_best(.x, metric = "roc_auc"))
+)
+
+# tibble for tuning performance
+tune_performance_diff_recipe <- tune_results_diff_recipe %>% 
+  select(model_type, best_model) %>% 
+  unnest(best_model) %>% 
+  group_by(model_type) %>% 
+  filter(mean == max(mean)) %>%  
+  arrange(desc(mean)) %>% 
+  select(model_type, mean, std_err)
+
+# print table
+tune_performance_diff_recipe %>% 
+  rename("ROC AUC" = mean, "Model Type" = model_type, 
+         "Standard Error" = std_err) %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  row_spec(1, color = "white",
+              background = "blue") %>% 
+  kableExtra::footnote(general = "Best Performance across two best Models with Two Different Upsampling Recipes")
+```
+<br>
+
+As shown, even though the tuning result with the oversampling step is not as good as the result without the oversampling step, the difference is very small. For the Elastic Net model the difference of the model with the 0.2 ratio upsampling recipe and the 0.5 ratio upsampling recipe in comparison to the original recipe is 0.0010114 and 0.003307, respectively. Both numbers are smaller than 0.0065819, the standard error of the result of the Elastic Net model with the original recipe (which is also the best model overall). Similarly, in Boosted Tree model, there is no significant decline in performance when the upsampling step is applied. Also, the ROC-AUC score of the model with the upsampling recipe with `over_ratio` set to 0.5 is actually higher than the ROC-AUC score of the model with the upsampling recipe with `over_ratio` set to 0.5 by 0.0006822. 
+<br>
+
+Based on the observation, we concluded that there is no sufficient statistical evidence that applying over-sampling or setting `over_ratio` to a higher number will have strong negative impacts on the model performance. 
+
+#### Tuning Time
+
+We also organized the tuning time of all models using the original recipe into a table. The row showing the model type with the shortest tuning time is highlighted in green, and the row showing the tuning time for the "best-performance model (the elastic net model)" chosen in the previous section is highlighted in blue:
+```{r tuning-time}
+# result tibble
+tune_time <- tibble(
+  model_type = c("K-nearest Neighbors", 
+                 "Multivariate Adaptive Regression Splines", 
+                 "Elastic Net", "SVM Polynomial", 
+                 "Random Forest", "Boosted Tree"), 
+  tuning_time = list(41.969, 43.295, 47.477, 101.668, 411.727, 844.824))
+
+# print tibble
+tune_time %>% 
+  inner_join(tune_performance_orig %>% select(c(model_type, mean))) %>% 
+  rename("ROC AUC" = mean, "Model Type" = model_type, 
+         "Tuning Time" = tuning_time) %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  row_spec(3, color = "white",
+              background = "blue") %>% 
+  row_spec(1, color = "white",
+              background = "green") %>% 
+  kableExtra::footnote(general = "Run time for the tuning process for the 6 model types")
+  
+```
+<br>
+
+As shown, the tuning run time for the Boosted Tree model is the longest, and it takes 844.824 seconds. The tuning run time for the Nearest Neighbors model is the shortest, and it takes 41.969 seconds. The model type with the best performance, the elastic net model, has a tuning run time of 47.477 seconds, which is the third shortest among all models. 
+<br>
+
+### Best Model 
+
+According to the previous section, the best model overall is the Elastic Net model with the original recipe. We printed the parameter combination for the elastic net model that yields the best performance. The row showing the parameter set with the optimal "ROC-AUC" value is highlighted in blue:
+```{r}
+# elastic net model
+show_best(en_tuned, metric = "roc_auc") %>% 
+  select(-.config) %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  row_spec(1, color = "white",
+              background = "blue") %>% 
+  kableExtra::footnote(general = "Tuning Result for Elastic Net Model")
+```
+<br>
+
+As shown, the best performance model is the elastic net model with parameter `penalty` equals 0.0031623 and parameter `mixture` equals 1.00.
+<br>
+
