@@ -1,0 +1,347 @@
+---
+title: "Stat 301-3 Final Project Executive Summary"
+author: "Mingze Yan, Xi Kang"
+date: "6/7/2021"
+output:
+  html_document: 
+    code_folding: hide
+    toc: true
+    toc_float: true
+    highlight: "tango"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r load-packages-set-seed}
+## Load Packages, Set Seed
+library(tidyverse)
+library(tidymodels)
+library(skimr)
+library(naniar)
+library(kableExtra)
+library(corrplot)
+library(corrr)
+library(tictoc)
+library(themis)
+set.seed(123)
+```
+
+
+## Introduction
+This is the STAT301-3 Final Project Executive Summary. We intend to use the data provided from Kaggle (https://www.kaggle.com/fedesoriano/stroke-prediction-dataset) to predict whether one person will have stroke using classifying approach. This report contains Explorative Data Analysis important findings and selected model's performance.
+
+## EDA important findings
+
+```{r, load-data-and-split}
+stroke_data <- readRDS("data/processed/stroke_data.rds")
+
+## split data ----
+stroke_split <- initial_split(stroke_data, prop = 0.7, strata = stroke)
+stroke_train <- training(stroke_split)
+stroke_test <- testing(stroke_split)
+```
+
+
+```{r outcome-var-plot, fig.height= 7, fig.width=7}
+# plot
+stroke_train %>%
+  ggplot(aes(stroke, fill = stroke)) + 
+  geom_bar(show.legend = FALSE) + 
+  labs(
+    x = "Stroke", 
+    y = "Number of Observations", 
+    title = "Distribution of Response Variable"
+  ) + 
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count",
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25
+  )
+```
+The first important finding from our EDA is that our outcome variable `stroke`  has a strong class imbalance with only 174 data classified to be `Yes` and 3403 
+data classified to be `No`. That leads to why when we create three different model recipes with two having oversampling with different over-sampling ratios and one not having oversampling. 
+
+```{r}
+# overview table
+stroke_train %>% 
+  miss_var_summary() %>% 
+  kbl() %>% 
+  kable_classic() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover")) %>% 
+  row_spec(1, color = "white",
+           background = "blue") %>% 
+  kableExtra::footnote(
+    general = "Number and Percentage of Missing Values in Each Variable"
+  )
+```
+
+The second important finding is that based on the table above, only one variable `bmi` has the missingness and it has around 3.83% missingness. Therefore, we decide to use bag impute to impute missingness for `bmi` in the recipe.
+
+```{r}
+# distribution of avg_glucose_level
+ggplot(stroke_train, aes(avg_glucose_level)) + 
+  geom_histogram(binwidth = 5) + 
+  labs(
+    x = "Average Glucose Level", 
+    y = "number of observations", 
+    title = "Distribution of `avg_glucose_level` in the Training Set"
+  )
+
+# distribution of bmi
+ggplot(stroke_train, aes(bmi)) + 
+  geom_histogram(binwidth = 1) + 
+  labs(
+    x = "BMI (Body Mass Index)", 
+    y = "number of observations", 
+    title = "Distribution of `bmi` in the Training Set"
+  )
+```
+Moreover, the third important finding is that based on the plots that graph the distribution of `avg_glucose_level` and `bmi` in the training set, both of these variables are severly right-skewed. Therefore, it leads us to choose to log-transform `avg_glucose_level` and `bmi` in the recipe by using `step_log()`.
+
+## Model Performance
+
+```{r recipes, eval=FALSE}
+# Build recipe ----
+# original recipe - no over-sampling
+stroke_recipe_orig <- recipe(stroke ~ ., data = stroke_train) %>% 
+  step_impute_bag(bmi) %>% # bag impute bmi missing values
+  step_log(avg_glucose_level, bmi) %>% 
+  step_interact(bmi ~ age) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+
+# recipe with 0.2 ratio over-sampling
+stroke_recipe_over_sampling_1 <- recipe(stroke ~ ., data = stroke_train) %>% 
+  # over-sampling, 0.2 ratio
+  step_upsample(stroke, over_ratio = 0.2) %>%
+  step_impute_bag(bmi) %>% # bag impute bmi missing values
+  step_log(avg_glucose_level, bmi) %>% 
+  step_interact(bmi ~ age) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+
+# recipe with 0.5 ratio over-sampling
+stroke_recipe_over_sampling_2 <- recipe(stroke ~ ., data = stroke_train) %>% 
+  # over-sampling, 0.5 ratio
+  step_upsample(stroke, over_ratio = 0.5) %>%
+  step_impute_bag(bmi) %>% # bag impute bmi missing values
+  step_log(avg_glucose_level, bmi) %>% 
+  step_interact(bmi ~ age) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+```
+We build the three recipes based on the EDA and then we tune the recipes to train the six models. 
+1.  Elastic Net
+    - parameters `mixture` and `penalty` are tuned
+    
+2.  Nearest neighbors
+    - the number of neighbors is tuned
+
+3.  Random forest
+    - parameters `mtry` and `min_n` are tuned
+
+4.  Boosted tree
+    - parameters `mtry`, `min_n`, and `learn_rate` are tuned
+
+5.  Support vector machine (polynomial)
+    - `cost`, `degree`, and `scale_factor` are tuned
+
+6.  Multivariate adaptive regression splines (MARS)
+    - parameter `num_terms` is tuned
+    
+```{r load-modeling-setup-and-results}
+# Load setup
+load("data/stroke_setup.rda")
+
+# load result
+load("bt_tune_orig_recipe.rda")
+load("en_tune_orig_recipe.rda")
+load("knn_tune_orig_recipe.rda")
+load("rf_tune_orig_recipe.rda")
+load("svmp_tune_orig_recipe.rda")
+load("mars_tune_orig_recipe.rda")
+load("bt_tune_upsample_recipe1.rda")
+load("en_tune_upsample_recipe1.rda")
+load("knn_tune_upsample_recipe1.rda")
+load("rf_tune_upsample_recipe1.rda")
+load("svmp_tune_upsample_recipe1.rda")
+load("mars_tune_upsample_recipe1.rda")
+```
+
+After tuning and training the models, we can find the most optimal model.
+## Original Recipe 
+
+```{r result-tibble-orig}
+# result tibble
+tune_results_orig <- tibble(
+  model_type = c("Elastic Net", "K-nearest Neighbors", "Random Forest", "Boosted Tree", "SVM Polynomial", "Multivariate Adaptive Regression Splines"), 
+  tune_info = list(en_tuned, nn_tuned, rf_tuned, bt_tuned, 
+                   svmp_tuned, mars_tuned), 
+  # assess model tuning results
+  assessment_info = map(tune_info, collect_metrics), 
+  # judge models based on the accuracty metric
+  best_model = map(tune_info, ~ show_best(.x, metric = "roc_auc"))
+)
+
+# tibble for tuning performance
+tune_performance_orig <- tune_results_orig %>% 
+  select(model_type, best_model) %>% 
+  unnest(best_model) %>% 
+  group_by(model_type) %>% 
+  filter(mean == max(mean)) %>%  
+  arrange(desc(mean)) %>% 
+  select(model_type, mean, std_err)
+
+# print table
+tune_performance_orig %>% 
+  rename("ROC AUC" = mean, "Model Type" = model_type, 
+         "Standard Error" = std_err) %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  row_spec(1, color = "white",
+              background = "blue") %>% 
+  kableExtra::footnote(general = "Best Performance for 6 Candidate Models Using Original Recipe")
+```
+The chart shows that within this 6 candidate models using original recipe, Elastic Net model performs the best with the highest mean ROC_AUC (0.8386933) and lowest standard error (0.0065819). Because the second best performing model is boosted tree and it has a very close mean ROC_AUC (0.8382027) with elastic net model and the difference between the mean ROC_AUC of these two models is only 0.0004906 which is much smaller than the standard error of the Elastic Net model. Therefore, the Elastic Net model doesn't have a significantly better performance than the boosted tree model.
+
+## Upsampling Recipe
+```{r result-tibble-upsample1}
+# result tibble
+tune_results_upsample1 <- tibble(
+  model_type = c("Elastic Net", "K-nearest Neighbors", "Random Forest", "Boosted Tree", "SVM Polynomial", "Multivariate Adaptive Regression Splines"), 
+  tune_info = list(en_tuned_over_sampling_1, nn_tuned_over_sampling_1, rf_tuned_over_sampling_1, bt_tuned_over_sampling_1, svmp_tuned_over_sampling_1, mars_tuned_over_sampling_1), 
+  # assess model tuning results
+  assessment_info = map(tune_info, collect_metrics), 
+  # judge models based on the accuracty metric
+  best_model = map(tune_info, ~ show_best(.x, metric = "roc_auc"))
+)
+
+# tibble for tuning performance
+tune_performance_upsample1 <- tune_results_upsample1 %>% 
+  select(model_type, best_model) %>% 
+  unnest(best_model) %>% 
+  group_by(model_type) %>% 
+  filter(mean == max(mean)) %>%  
+  arrange(desc(mean)) %>% 
+  select(model_type, mean, std_err)
+
+# print table
+tune_performance_upsample1 %>% 
+  rename("ROC AUC" = mean, "Model Type" = model_type, 
+         "Standard Error" = std_err) %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  row_spec(1, color = "white",
+              background = "blue") %>% 
+  kableExtra::footnote(general = "Best Performance for 6 Candidate Models Using Upsampling Recipe")
+```
+The chart shows that the elastic net model is still the best performing model when using upsampling recipe. It has a highest mean ROC_AUC (0.8376819) and the lowest standard error (0.0068808). Similar to the original recipe ones, the boosted tree is the second best performing model. However, the difference between the mean ROC_AUC of these two models is 0.0045896 which is smaller than elastic net model's standard error. Therefore, it elastic net model doesn't show a significantly better performance than boosted tree model. 
+
+## Comparison between original recipe and over-sampling recipe
+By comparing the two tables above, it can be noticed that there is no strong difference in performance between original recipe and upsampling recipe. 
+In order to make a more direct comparison, we choose the first and second best performing models to make a direct comparison across recipes.
+
+```{r cross-model-cross-recipe-results}
+# result tibble
+tune_results_diff_recipe <- tibble(
+  model_type = c("Elastic Net (Original Recipe)", 
+                 "Boosted Tree (Original Recipe)", 
+                 "Elastic Net (Upsampling Recipe)", 
+                 "Boosted Tree (Upsampling Recipe)"), 
+  tune_info = list(en_tuned, bt_tuned, 
+                   en_tuned_over_sampling_1, 
+                   bt_tuned_over_sampling_1), 
+  # assess model tuning results
+  assessment_info = map(tune_info, collect_metrics), 
+  # judge models based on the accuracty metric
+  best_model = map(tune_info, ~ show_best(.x, metric = "roc_auc"))
+)
+
+# tibble for tuning performance
+tune_performance_diff_recipe <- tune_results_diff_recipe %>% 
+  select(model_type, best_model) %>% 
+  unnest(best_model) %>% 
+  group_by(model_type) %>% 
+  filter(mean == max(mean)) %>%  
+  arrange(desc(mean)) %>% 
+  select(model_type, mean, std_err)
+
+# print table
+tune_performance_diff_recipe %>% 
+  rename("ROC AUC" = mean, "Model Type" = model_type, 
+         "Standard Error" = std_err) %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  row_spec(1, color = "white",
+              background = "blue") %>% 
+  kableExtra::footnote(general = "Best Performance across Different Models and Different Recipes")
+```
+From the table, it can be seen that the elastic net and boosted tree models using original recipe have better performance than ones using upsampling recipe. However, the difference between the mean ROC-AUC score of different recipes of the Elastic Net model is only 0.0010114, much smaller than its standard error 0.0065819. Therefore, we want to include the 0.5 upsampling ratio recipe to our discussion to make a comparison between these three recipe altogether.
+
+```{r}
+# load results
+load("bt_tune_upsample_recipe2.rda")
+load("en_tune_upsample_recipe2.rda")
+
+# organize into table
+# result tibble
+tune_results_diff_recipe <- tibble(
+  model_type = c("Elastic Net (Original Recipe)", 
+                 "Boosted Tree (Original Recipe)", 
+                 "Elastic Net (Upsampling Recipe (0.2 ratio))",
+                 "Boosted Tree (Upsampling Recipe (0.2 ratio))", 
+                 "Elastic Net (Upsampling Recipe (0.5 ratio))",
+                 "Boosted Tree (Upsampling Recipe (0.5 ratio))"), 
+  tune_info = list(en_tuned, bt_tuned, 
+                   en_tuned_over_sampling_1, 
+                   bt_tuned_over_sampling_1, 
+                   en_tuned_over_sampling_2, 
+                   bt_tuned_over_sampling_2), 
+  # assess model tuning results
+  assessment_info = map(tune_info, collect_metrics), 
+  # judge models based on the accuracty metric
+  best_model = map(tune_info, ~ show_best(.x, metric = "roc_auc"))
+)
+
+# tibble for tuning performance
+tune_performance_diff_recipe <- tune_results_diff_recipe %>% 
+  select(model_type, best_model) %>% 
+  unnest(best_model) %>% 
+  group_by(model_type) %>% 
+  filter(mean == max(mean)) %>%  
+  arrange(desc(mean)) %>% 
+  select(model_type, mean, std_err)
+
+# print table
+tune_performance_diff_recipe %>% 
+  rename("ROC AUC" = mean, "Model Type" = model_type, 
+         "Standard Error" = std_err) %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  row_spec(1, color = "white",
+              background = "blue") %>% 
+  kableExtra::footnote(general = "Best Performance across two best Models with Two Different Upsampling Recipes")
+```
+
+Based on the table above, the models with original recipe perform the best and different upsampling ratios have different performances based on models. Even though the tuning result with the oversampling step is not as good as the result without the oversampling step, the difference is very small. For the Elastic Net model the difference of the model with the 0.2 ratio upsampling recipe and the 0.5 ratio upsampling recipe compared with the original recipe is 0.0010114 and 0.003307, respectively. Both numbers are smaller than 0.0065819, the standard error of the result of the Elastic Net model with the original recipe. Similarly, in Boosted Tree model, there is no significant decline in performance when the upsampling step is applied. Also, the ROC-AUC score of the model with the upsampling recipe with over_ratio set to 0.5 (0.8337745) is actually higher than the ROC-AUC score of the model with the upsampling recipe with over_ratio set to 0.2 (0.8330923). 
+
+As a result, we can conclude that there is no sufficient statistical evidence that applying over-sampling or setting  over_ratio to a higher number will have strong negative impacts on the model performance. 
+
+
+
+
+
+
+
+
+
+
+
+
+

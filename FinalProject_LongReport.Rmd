@@ -741,7 +741,7 @@ tune_performance_upsample1 %>%
 ```
 <br>
 
-As shown, for the upsampling recipe, the best performing model is also the Elastic Net model, with mean ROC-AUC score of 0.8376819. The second best model is also the Boosted Tree model. However, for this recipe, the difference between the mean ROC-AUC score of the Elastic Net model and the second best model (Boosted Tree) is 0.0045896, smaller than its standard error, which is 0.0068808. Thus, Elastic Net model is the best performing model for the recipe with over-sampling step, and it shows significantly better performance than the second best Boosted Tree model. 
+As shown, for the upsampling recipe, the best performing model is also the Elastic Net model, with mean ROC-AUC score of 0.8376819. The second best model is also the Boosted Tree model. However, for this recipe, the difference between the mean ROC-AUC score of the Elastic Net model and the second best model (Boosted Tree) is 0.0045896, smaller than its standard error, which is 0.0068808. Thus, Elastic Net model is the best performing model for the recipe with over-sampling step, and it doesn't show a significantly better performance than the second best Boosted Tree model. 
 <br>
 
 #### Impact of Over-sampling
@@ -846,7 +846,7 @@ tune_performance_diff_recipe %>%
 ```
 <br>
 
-As shown, even though the tuning result with the oversampling step is not as good as the result without the oversampling step, the difference is very small. For the Elastic Net model the difference of the model with the 0.2 ratio upsampling recipe and the 0.5 ratio upsampling recipe in comparison to the original recipe is 0.0010114 and 0.003307, respectively. Both numbers are smaller than 0.0065819, the standard error of the result of the Elastic Net model with the original recipe (which is also the best model overall). Similarly, in Boosted Tree model, there is no significant decline in performance when the upsampling step is applied. Also, the ROC-AUC score of the model with the upsampling recipe with `over_ratio` set to 0.5 is actually higher than the ROC-AUC score of the model with the upsampling recipe with `over_ratio` set to 0.5 by 0.0006822. 
+As shown, even though the tuning result with the oversampling step is not as good as the result without the oversampling step, the difference is very small. For the Elastic Net model the difference of the model with the 0.2 ratio upsampling recipe and the 0.5 ratio upsampling recipe in comparison to the original recipe is 0.0010114 and 0.003307, respectively. Both numbers are smaller than 0.0065819, the standard error of the result of the Elastic Net model with the original recipe (which is also the best model overall). Similarly, in Boosted Tree model, there is no significant decline in performance when the upsampling step is applied. Also, the ROC-AUC score of the model with the upsampling recipe with `over_ratio` set to 0.5 is actually higher than the ROC-AUC score of the model with the upsampling recipe with `over_ratio` set to 0.2 by 0.0006822. 
 <br>
 
 Based on the observation, we concluded that there is no sufficient statistical evidence that applying over-sampling or setting `over_ratio` to a higher number will have strong negative impacts on the model performance. 
