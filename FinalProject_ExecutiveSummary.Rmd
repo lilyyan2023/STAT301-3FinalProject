@@ -30,7 +30,7 @@ set.seed(123)
 
 
 ## Introduction
-This is the STAT301-3 Final Project Executive Summary. We intend to use the data provided from Kaggle (https://www.kaggle.com/fedesoriano/stroke-prediction-dataset) to predict whether one person will have stroke using classifying approach. This report contains Explorative Data Analysis important findings and selected model's performance.
+This is the STAT301-3 Final Project Executive Summary.This project uses the stroke dataset from [Kaggle](https://www.kaggle.com/fedesoriano/stroke-prediction-dataset). The goal of the project is to predict whether one person will have stroke based on their lifestyle and health status data through a classification approach. The project breaks into the Exploratory Data Analysis section and the Predictive modeling section. This report contains the key findings of each section.
 
 ## EDA important findings
 
@@ -43,7 +43,9 @@ stroke_train <- training(stroke_split)
 stroke_test <- testing(stroke_split)
 ```
 
+### Class Imbalance
 
+The first main finding of the EDA section is that the outcome variable `stroke` has a severe class imbalance. 
 ```{r outcome-var-plot, fig.height= 7, fig.width=7}
 # plot
 stroke_train %>%
@@ -61,24 +63,14 @@ stroke_train %>%
     vjust = -0.25
   )
 ```
-The first important finding from our EDA is that our outcome variable `stroke`  has a strong class imbalance with only 174 data classified to be `Yes` and 3403 
-data classified to be `No`. That leads to why when we create three different model recipes with two having oversampling with different over-sampling ratios and one not having oversampling. 
+<br>
 
-```{r}
-# overview table
-stroke_train %>% 
-  miss_var_summary() %>% 
-  kbl() %>% 
-  kable_classic() %>% 
-  kable_styling(bootstrap_options = c("striped", "hover")) %>% 
-  row_spec(1, color = "white",
-           background = "blue") %>% 
-  kableExtra::footnote(
-    general = "Number and Percentage of Missing Values in Each Variable"
-  )
-```
+As shown, only 174 observatinos has value `Yes` and 3403 observations are in class `No`. This observation inspired us to explore the over-sampling methods as a potential approach to solve the problem of class imbalance. In the modeling process, we compared three different recipes with two having upsampling step with different over-sampling ratios and one original recipe without oversampling.
+<br>
 
-The second important finding is that based on the table above, only one variable `bmi` has the missingness and it has around 3.83% missingness. Therefore, we decide to use bag impute to impute missingness for `bmi` in the recipe.
+### Skewness in Numeric Predictors
+
+The second important finding is that variables `avg_glucose_level` and `bmi` are right-skewed. 
 
 ```{r}
 # distribution of avg_glucose_level
@@ -99,9 +91,13 @@ ggplot(stroke_train, aes(bmi)) +
     title = "Distribution of `bmi` in the Training Set"
   )
 ```
-Moreover, the third important finding is that based on the plots that graph the distribution of `avg_glucose_level` and `bmi` in the training set, both of these variables are severly right-skewed. Therefore, it leads us to choose to log-transform `avg_glucose_level` and `bmi` in the recipe by using `step_log()`.
+<br>
 
-## Model Performance
+
+As shown in the plots, the right-skewness of both variables are pretty severe in the training set. Therefore, it leads us to log-transform `avg_glucose_level` and `bmi` in the recipe by using `step_log()`.
+<br>
+
+## Predictive Modeling Findings
 
 ```{r recipes, eval=FALSE}
 # Build recipe ----

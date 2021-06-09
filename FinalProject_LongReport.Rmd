@@ -812,8 +812,8 @@ tune_results_diff_recipe <- tibble(
                  "Boosted Tree (Original Recipe)", 
                  "Elastic Net (Upsampling Recipe (0.2 ratio))",
                  "Boosted Tree (Upsampling Recipe (0.2 ratio))", 
-                 "Elastic Net (Upsampling Recipe (0.5 ratio))",
-                 "Boosted Tree (Upsampling Recipe (0.5 ratio))"), 
+                 "Elastic Net (Upsampling Recipe (0.5 ratio))", 
+                 "Boosted Tree (Upsampling Recipe (0.5  ratio))"), 
   tune_info = list(en_tuned, bt_tuned, 
                    en_tuned_over_sampling_1, 
                    bt_tuned_over_sampling_1, 
@@ -900,3 +900,101 @@ show_best(en_tuned, metric = "roc_auc") %>%
 As shown, the best performance model is the elastic net model with parameter `penalty` equals 0.0031623 and parameter `mixture` equals 1.00.
 <br>
 
+### Visualization of Tuning Results
+
+Since the elastic net model and the boosted tree model are shown to be the two best candidate model types, we used `autoplot()` to examine the tuning result of these model types with the original recipe (without oversampling): 
+```{r visualize-tune-results, fig.height=8, fig.width=8}
+autoplot(en_tuned, metric = "roc_auc")
+autoplot(bt_tuned, metric = "roc_auc")
+```
+<br>
+
+As shown, for the elastic net model, the ROC-AUC value flattens at a value slightly under 0.84 for parameter combinations with all different `mixture` values and `penalty` values below 0.01. The ROC-AUC value shows an obvious drop for `penalty` values greater than 0.01 for all different `mixture` values. The highest ROC-AUC value is obtained for the `mixture` value of 1 and the `penalty value` around 0.003. 
+<br>
+
+For the boosted tree model, the ROC-AUC value is in general higher for `learn_rate` equaling to 0.17782 for all parameter combinations. The best performance, indicated by the highest ROC-AUC score, happens at `mtry` equals to 11 and `min_n` equals to 21. 
+<br>
+
+### Fit Entire Training Set
+
+We then fit the winning model to the entire training set: 
+```{r fit-training-set}
+en_workflow_tuned <- en_workflow %>% 
+  finalize_workflow(select_best(en_tuned, metric = "roc_auc"))
+
+en_results <- fit(en_workflow_tuned, stroke_train)
+```
+
+### Fit Testing Set
+
+To examine the chosen model's performance on the brand-new, untouched testing dataset, we used `predict()`, `bind_cols()`, and `metric_set()` to fit the tuned model to the `stroke_test`. We looked at both the ROC-AUC and accuracy metrics. 
+```{r fit-test-set}
+# create metric set
+stroke_metrics <- yardstick::metric_set(yardstick::roc_auc, 
+                                       yardstick::accuracy)
+
+# show result of prediction on testing data
+predict(en_results, new_data = stroke_test) %>% 
+  bind_cols(stroke_test %>% select(stroke)) %>% 
+  bind_cols(predict(en_results, 
+                    new_data = stroke_test, type = "prob")) %>%
+  stroke_metrics(truth = stroke, 
+                 estimate = .pred_class, .pred_Yes) %>% 
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+<br>
+
+As shown, applying the winning model on the test set, the accuracy score is 0.9510763, the model correctly classified the stroke risk for 95.1% of the individuals in the testing dataset. However, due to the severe class imbalance in the outcome variable `stroke`, judging the model performance based on this accuracy metric might be misleading. 
+<br>
+
+The ROC-AUC metric when fitting the model to the test set is 0.8508. The ROC-AUC metric provides an insight into the model's capability at distinguishing between classes, and it is indifferent to the class imbalance. The ROC-AUC value of 0.8508 is slightly higher than the best value gained in tuning, which is 0.8386933. This result suggests that the model performs pretty well on the new data. 
+<br>
+
+The ROC-AUC curve is plotted below as a reference. 
+```{r roc-auc-curve}
+# generate predictions
+best_model_pred <- 
+  predict(en_results, new_data = stroke_test) %>% 
+  bind_cols(stroke_test %>% select(stroke)) %>% 
+  bind_cols(predict(en_results, 
+                    new_data = stroke_test, type = "prob"))
+# create ROC curve
+stroke_curve <- 
+  roc_curve(best_model_pred, truth = stroke, .pred_Yes)
+# plot ROC curve
+autoplot(stroke_curve)
+```
+<br>
+
+### Discussion and Future Direction
+
+Judging by the ROC-AUC metric, the elastic net model is the winning model type for all different recipes considered. The highest ROC-AUC metric value in tuning is 0.8386933. From [online resources](https://corporatefinanceinstitute.com/resources/knowledge/other/elastic-net/), we learned that the elastic net model performs well when there are groups of correlated independent variables in the dataset. This explanation relates to our findings in the EDA section. In the EDA section, we noted that variable `age` is clearly correlated `heart_disease` (plot included in earlier section). In common knowledge, age is an important factor impacting the health status of an individual. Also, many health factors, such as average glucose level, bmi, and smoking status are correlated in common understanding. However, due to time restriction, we did not have time to fully explore these correlations in the EDA section. To better understand why the elastic net model is the winning model type, future studies can be done to thoroughly assess the degree of correlation between the independent variables in the dataset. 
+<br>
+
+Although the ROC-AUC values for the same model using recipe with over-sampling and recipe without over-sampling are not exactly the same, the difference is generally small for most model types. Looking at online documentations, we learned that some operations can be performed to actually tune the `over_ratio` parameter to improve model performance. Thus, tuning `over_ratio` can be a direction for future implications. <br>
+
+Another direction can be to examine whether all types of models are impacted in the same way by over-sampling. Organizing the results, we noticed that the ROC-AUC value for the MARS (Multivariate Adaptive Regression Splines) model is actually higher using the recipe with the over-sampling step. Therefore, it is worth investigating the reason behind this "improvement" for this specific model type. 
+<br>
+
+Lastly, from the discussion with the instructional team, we learned that there are multiple methods handling the class imbalance issue besides over-sampling. For example, we can use random under-sampling. However, each methods have their own pros and cons. For example, since over-sampling is to duplicate random records from the minority class, it can lead to overfishing. In comparison, under-sampling involves removing random records from the majority class, which can cause loss of information. In the future, we can keep exploring the trade-off between different methods of solving the problem of class imbalance. 
+
+## Conclusion
+
+This project focuses on data modeling and analysis of the "Stroke Prediction Dataset" provided on [Kaggle](https://www.kaggle.com/fedesoriano/stroke-prediction-dataset). The data documents the stroke risk and the relevant health data for individual patients. 
+<br>
+
+The goal of the project is to determine whether a patient will have stroke (indicated by the `stroke` variable) based on input parameters like gender, age, related diseases, body mass index (bmi), and smoking status. The predictive goal of this project is classification. 
+<br>
+
+The EDA section discovered the severe class imbalance in the outcome varible and several categorical predictors, the skewness of a few numeric predictors, and the presence of small size missingness. Based on the findings, stratified sampling is used. Also, recipe steps for imputation, log-transformation, and over-sampling steps are considered in the following modeling section. 
+<br>
+
+The predictive modeling section trained and tuned six types of models for classification prediction. To explore the impact of over-sampling, three different recipes are examined: the recipe without upsampling step, the recipe with upsampling `over_ratio` set to 0.2, and the recipe with upsampling `over_ratio` set to 0.5. Among all the recipe-model combinations tried, the elastic net model with the original recipe (without oversampling) shows the highest ROC-AUC metric 0.8386933, and it is chosen to be the winning model. The chosen model is then fit to the entire training set and the test set afterwards for final assessment of its performance. Using the testing set, the model has a ROC-AUC value of 0.8508733, and an accuracy value of 0.9510763. The model's performance in predicting the brand-new test set is adequate judging from the ROC-AUC value, since it correctly distinguishes the classes for 85% of the input data samples. 
+<br>
+
+Based on the results, observations, and limitations of the current project, future studies can be conducted to further access the impact of over-sampling methods on model performance, to better understand the correlations between independent variables, and to keep exploring different methods for solving the problem of class imbalance. 
+
+## Github Link
+
+[https://github.com/lilyyan2023/STAT301-3FinalProject](https://github.com/lilyyan2023/STAT301-3FinalProject){target="_blank"}
