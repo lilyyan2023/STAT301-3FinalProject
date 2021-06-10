@@ -993,7 +993,7 @@ The EDA section discovered the severe class imbalance in the outcome varible and
 The predictive modeling section trained and tuned six types of models for classification prediction. To explore the impact of over-sampling, three different recipes are examined: the recipe without upsampling step, the recipe with upsampling `over_ratio` set to 0.2, and the recipe with upsampling `over_ratio` set to 0.5. Among all the recipe-model combinations tried, the elastic net model with the original recipe (without oversampling) shows the highest ROC-AUC metric 0.8386933, and it is chosen to be the winning model. The chosen model is then fit to the entire training set and the test set afterwards for final assessment of its performance. Using the testing set, the model has a ROC-AUC value of 0.8508733, and an accuracy value of 0.9510763. The model's performance in predicting the brand-new test set is adequate judging from the ROC-AUC value, since it correctly distinguishes the classes for 85% of the input data samples. 
 <br>
 
-Based on the results, observations, and limitations of the current project, future studies can be conducted to further access the impact of over-sampling methods on model performance, to better understand the correlations between independent variables, and to keep exploring different methods for solving the problem of class imbalance. 
+Based on the results, observations, and limitations of the current project, future studies can be conducted to further assess the impact of over-sampling methods on model performance, to better understand the correlations between independent variables, and to keep exploring different methods for solving the problem of class imbalance. 
 
 ## Github Link
 

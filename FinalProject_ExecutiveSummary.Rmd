@@ -43,7 +43,7 @@ stroke_train <- training(stroke_split)
 stroke_test <- testing(stroke_split)
 ```
 
-### Class Imbalance
+### Finding 1: Class Imbalance
 
 The first main finding of the EDA section is that the outcome variable `stroke` has a severe class imbalance. 
 ```{r outcome-var-plot, fig.height= 7, fig.width=7}
@@ -68,7 +68,7 @@ stroke_train %>%
 As shown, only 174 observatinos has value `Yes` and 3403 observations are in class `No`. This observation inspired us to explore the over-sampling methods as a potential approach to solve the problem of class imbalance. In the modeling process, we compared three different recipes with two having upsampling step with different over-sampling ratios and one original recipe without oversampling.
 <br>
 
-### Skewness in Numeric Predictors
+### Finding 2: Skewness in Numeric Predictors
 
 The second important finding is that variables `avg_glucose_level` and `bmi` are right-skewed. 
 
@@ -99,6 +99,28 @@ As shown in the plots, the right-skewness of both variables are pretty severe in
 
 ## Predictive Modeling Findings
 
+We built and trained **6 candidate model types**. The candidate models and the parameters tuned for each model is summarized below: 
+
+1.  Elastic Net
+    - parameters `mixture` and `penalty` are tuned
+    
+2.  Nearest neighbors
+    - the number of neighbors is tuned
+
+3.  Random forest
+    - parameters `mtry` and `min_n` are tuned
+
+4.  Boosted tree
+    - parameters `mtry`, `min_n`, and `learn_rate` are tuned
+
+5.  Support vector machine (polynomial)
+    - `cost`, `degree`, and `scale_factor` are tuned
+
+6.  Multivariate adaptive regression splines (MARS)
+    - parameter `num_terms` is tuned
+<br>
+
+To investigate the impact of upsampling on the predictive capacity of the candidate models, we paired each model with two recipes: one original recipe, and one recipe with `step_upsample(stroke, over_ratio = 0.2)`, which over-samples the outcome variable with `over_ratio` of 0.2. Then, to further explore the impact of different `over_ratio` values, we paired the two best model types from the previous model tuning results with the third recipe, with the `over_ratio` parameter set to 0.5. The recipes are included in the hidden code chunk below. 
 ```{r recipes, eval=FALSE}
 # Build recipe ----
 # original recipe - no over-sampling
@@ -132,25 +154,7 @@ stroke_recipe_over_sampling_2 <- recipe(stroke ~ ., data = stroke_train) %>%
   step_zv(all_predictors()) %>% 
   step_normalize(all_predictors())
 ```
-We build the three recipes based on the EDA and then we tune the recipes to train the six models. 
 
-1.  Elastic Net
-    - parameters `mixture` and `penalty` are tuned
-    
-2.  Nearest neighbors
-    - the number of neighbors is tuned
-
-3.  Random forest
-    - parameters `mtry` and `min_n` are tuned
-
-4.  Boosted tree
-    - parameters `mtry`, `min_n`, and `learn_rate` are tuned
-
-5.  Support vector machine (polynomial)
-    - `cost`, `degree`, and `scale_factor` are tuned
-
-6.  Multivariate adaptive regression splines (MARS)
-    - parameter `num_terms` is tuned
     
 ```{r load-modeling-setup-and-results}
 # Load setup
@@ -171,9 +175,17 @@ load("svmp_tune_upsample_recipe1.rda")
 load("mars_tune_upsample_recipe1.rda")
 ```
 
-After tuning and training the models, we can find the most optimal model.
 
-## Original Recipe 
+Below are the key findings from the Predictive Modeling section. 
+
+### Finding 1: Elastic Net as the Winning Model
+
+Due to the class imbalance, the accuracy metric is misleading in conveying information regarding the model performance. Thus, we chose to find the best model based on the value of the ROC-AUC metric. 
+<br>
+
+Both the tuning result of the original recipe and the result of the first over-sampling recipe (`over_ratio = 0.2`) suggest that the best model based on the ROC-AUC metric is the elastic net model. The tuning results are explained below. 
+
+#### Original Recipe 
 
 ```{r result-tibble-orig}
 # result tibble
@@ -206,9 +218,11 @@ tune_performance_orig %>%
               background = "blue") %>% 
   kableExtra::footnote(general = "Best Performance for 6 Candidate Models Using Original Recipe")
 ```
-The chart shows that within this 6 candidate models using original recipe, Elastic Net model performs the best with the highest mean ROC_AUC (0.8386933) and lowest standard error (0.0065819). Because the second best performing model is boosted tree and it has a very close mean ROC_AUC (0.8382027) with elastic net model and the difference between the mean ROC_AUC of these two models is only 0.0004906 which is much smaller than the standard error of the Elastic Net model. Therefore, the Elastic Net model doesn't have a significantly better performance than the boosted tree model.
+<br>
 
-## Upsampling Recipe
+The chart shows that within this 6 candidate models using original recipe, Elastic Net model performs the best with the highest mean ROC-AUC (0.8386933). However, the mean ROC-AUC of the second best model (the boosted tree) differs from the mean ROC-AUC of the elastic net model by only 0.0004906, smaller than its standard error 0.0065819. Therefore, the best model of Elastic Net does not have a significantly better performance than the best model of Boosted Tree. 
+
+#### Upsampling Recipe
 ```{r result-tibble-upsample1}
 # result tibble
 tune_results_upsample1 <- tibble(
@@ -239,11 +253,16 @@ tune_performance_upsample1 %>%
               background = "blue") %>% 
   kableExtra::footnote(general = "Best Performance for 6 Candidate Models Using Upsampling Recipe")
 ```
-The chart shows that the elastic net model is still the best performing model when using upsampling recipe. It has a highest mean ROC_AUC (0.8376819) and the lowest standard error (0.0068808). Similar to the original recipe ones, the boosted tree is the second best performing model. However, the difference between the mean ROC_AUC of these two models is 0.0045896 which is smaller than elastic net model's standard error. Therefore, it elastic net model doesn't show a significantly better performance than boosted tree model. 
+<br>
 
-## Comparison between original recipe and over-sampling recipe
-By comparing the two tables above, it can be noticed that there is no strong difference in performance between original recipe and upsampling recipe. 
-In order to make a more direct comparison, we choose the first and second best performing models to make a direct comparison across recipes.
+The chart shows that the elastic net model is also the best performing model when using the over-sampling recipe. It has the highest mean ROC-AUC (0.8376819). In consistence with the original recipe result, the boosted tree is the second best performing model. Similarly, the difference between the mean ROC-AUC of these two models is 0.0045896, smaller than the best elastic net model's standard error. Therefore, the best elastic net model does not perform significantly better than the boosted tree model. 
+
+### Finding 2: Impact of Over-sampling on Model Performance
+
+By comparing the two tables above, it can be noticed that there is no significant difference in performance between the tuning results using the original recipe and the result using the upsampling recipe for the same model types. The ROC-AUC metric is not exactly the same for the same model types with different recipes. However, the difference is very small. 
+<br>
+
+For more direct comparison, we choose the first and second best performing models to compare their performance across recipes.
 
 ```{r cross-model-cross-recipe-results}
 # result tibble
@@ -280,7 +299,12 @@ tune_performance_diff_recipe %>%
               background = "blue") %>% 
   kableExtra::footnote(general = "Best Performance across Different Models and Different Recipes")
 ```
-From the table, it can be seen that the elastic net and boosted tree models using original recipe have better performance than ones using upsampling recipe. However, the difference between the mean ROC-AUC score of different recipes of the Elastic Net model is only 0.0010114, much smaller than its standard error 0.0065819. Therefore, we want to include the 0.5 upsampling ratio recipe to our discussion to make a comparison between these three recipe altogether. Therefore, the third major finding is that original recipe tends to perform better than upsampling recipe in our elastic net and boosted tree models. It might be when we over-sampling the sample whose stroke outcome is 1, these intentionally replication provides somewhat misleading input to model and leads to worse performance. 
+<br>
+
+From the table, it can be seen that the Elastic Net and Boosted Tree models using original recipe have better performance than ones using the upsampling recipe. However, the difference between the mean ROC-AUC values of Elastic Net models with different recipes is only 0.0010114, much lower than the standard error 0.0065819. 
+<br>
+
+Therefore, we included the second over-sampling recipe (`over_ratio = 0.5`) to further explore the impact of over-sampling. We found that, for the Elastic Net and Boosted Tree model types, the original recipe yields better performance than the over-sampling recipes. A possible explanation from online documentation is that the over-sampling process can cause over-fitting, leading to less ideal model performance. Since we used cross-validation to let the mean ROC-AUC score reflect how well our model can generalize and predict the outcome of interest on new data, the problem caused by over-fitting is reflected by the decline in mean ROC-AUC. 
 
 ```{r}
 # load results
@@ -324,15 +348,17 @@ tune_performance_diff_recipe %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
   row_spec(1, color = "white",
               background = "blue") %>% 
-  kableExtra::footnote(general = "Best Performance across two best Models with Two Different Upsampling Recipes")
+  kableExtra::footnote(general = "Best Performance across two best Models with Two Different Upsampling Recipes and the Original Recipe")
 ```
+<br>
 
-Based on the table above, the models with original recipe perform the best and different upsampling ratios have different performances based on models. Even though the tuning result with the oversampling step is not as good as the result without the oversampling step, the difference is very small. For the Elastic Net model the difference of the model with the 0.2 ratio upsampling recipe and the 0.5 ratio upsampling recipe compared with the original recipe is 0.0010114 and 0.003307, respectively. Both numbers are smaller than 0.0065819, the standard error of the result of the Elastic Net model with the original recipe. Similarly, in Boosted Tree model, there is no significant decline in performance when the upsampling step is applied. Also, the ROC-AUC score of the model with the upsampling recipe with over_ratio set to 0.5 (0.8337745) is actually higher than the ROC-AUC score of the model with the upsampling recipe with over_ratio set to 0.2 (0.8330923). 
+Shown by the table above, the models with original recipe perform the best and recipes with different upsampling ratios have different performances for the same model types. Even though the tuning result for the oversampling model is not as good as the result for the original, the difference is very small. For the Elastic Net model, when comparing the result of the model with 0.2 `over_ratio` and the result of the model with 0.5 `over_ratio` with the original recipe, the differences in mean ROC-AUC are 0.0010114 and 0.003307, respectively. Both numbers are smaller than 0.0065819, the standard error of the best Elastic Net model with the original recipe. Similarly, in Boosted Tree model, there is no significant decline in performance when the upsampling step is added to the recipe, or when the `over_ratio` parameter is changed. Interestingly, for the Boosted Tree model, the mean ROC-AUC score of the model with the upsampling recipe with `over_ratio` set to 0.5 (0.8337745) is actually higher than the ROC-AUC score of the model with the upsampling recipe with over_ratio set to 0.2 (0.8330923). 
 
-As a result, the fourth major finding we can conclude is that there is no sufficient statistical evidence that applying over-sampling or setting over_ratio to a higher number will have strong negative impacts on the model performance. 
+Thus, we conclude that applying over-sampling have only very little impacts on the predictive capacity of the models examined. Also, for the Elastic Net and Boosted Tree models types, setting `over_ratio` to a higher number will not have significant negative impacts on the model performance. 
 
-## Choose the best model and fit 
-Based on our previous result, the best model is the Elastic Net model with original recipe.
+### Finding 3: Best Model Shows Adequete Performance on New Data
+
+Based on our previous result, the best model is the Elastic Net model with original recipe. The table below summarizes the parameters for the winning model. 
 
 ```{r}
 # elastic net model
@@ -344,10 +370,11 @@ show_best(en_tuned, metric = "roc_auc") %>%
               background = "blue") %>% 
   kableExtra::footnote(general = "Tuning Result for Elastic Net Model")
 ```
+<br>
 
-By using ROC_AUC as the parameter to choose which tuning parameter values give the best performance, the table shows that elastic net model with 0.0031623 penalty and 1.00 mixture gives the best performance.
-
-We then use the best model to fit entire training set and testing set. Similarly, we use ROC_AUC and accuracy metrics to check our performance. 
+Using ROC-AUC as the metric for selecting the best parameter combination, the table shows that elastic net model with 0.0031623 penalty and 1.00 mixture gives the best performance.
+<br>
+We then fit the winning model to the test set to explore its performance on the new data. 
 
 ```{r fit-training-set}
 en_workflow_tuned <- en_workflow %>% 
@@ -371,13 +398,26 @@ predict(en_results, new_data = stroke_test) %>%
   kbl() %>% 
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 ```
+<br>
 
-Based on the table above, the accuracy achieve 0.9510763 which is very high. However, due to the severe class imbalance in the outcome variable `stroke`, using accuracy as the judging performance metric might be misleading. In addition, ROC_AUC of the model is 0.8508733. The ROC_AUC metric provides an insight into the model’s capability at distinguishing between classes, and it is indifferent to the class imbalance. Compared with the ROC_AUC from the tuning model (0.8386933), the ROC_AUC of test model is slightly higher. This result suggests that the model performs pretty well on the new data. The fifth major finding is that when we apply our best elastic net model with original recipe to the testing dataset, the result performs better and implies that our classification model building is successful.
+As shown, the accuracy metric when fitting to the test set is 0.9510763, indicating that the proportion of correct classifications is over 95%. However, due to the severe class imbalance in the outcome variable `stroke`, it is inappropriate to evaluate model performance based on the accuracy metric. 
+<br>
+
+The ROC-AUC metric is 0.8508733, suggesting that the winning model correctly distinguishes the class of 85% of the observations of the test data. The ROC_AUC metric shows the model’s capability at distinguishing between classes, and it is not greatly impacted by the class imbalance. Compared to the ROC-AUC from the tuning model (0.8386933), the ROC-AUC metric when applying the model on the test data is slightly higher. The result suggests that the winning model shows adequate performance on the new data.
 
 ## Conclusion
-In conclusion, in the executive summary, we summarize 5 major findings, including 2 findings from EDA of the dataset, 2 findings from comparing between original recipes and over-sampling recipes, and 1 last finding from fitting the best model to the testing dataset. 
 
+In conclusion, our project builds models to predict an individual's risk of having stroke through a classification approach using the Stroke Dataset from Kaggle. 
 
+We have 5 major findings. The 2 findings from the EDA section help us identify the nee for over-sampling and log-transformation in building the recipe. The 3 findings the Predictive Modeling section lead to the selection of the winning model, the insight into the impact of over-sampling methods on the predictive power of different models, and evaluation of the winning model's performance on the brand new data. 
+
+Our winning model achieved ROC-AUC metric of 0.8508733, suggesting adequet performance. 
+
+Future studies can be conducted based on the results of this project to better understand the impact of over-sampling methods on the performance of different model types and to further explore different methods for solving the problem of class imbalance.
+
+## Github Link
+
+[https://github.com/lilyyan2023/STAT301-3FinalProject](https://github.com/lilyyan2023/STAT301-3FinalProject){target="_blank"}
 
 
 
