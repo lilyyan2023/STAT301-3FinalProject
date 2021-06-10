@@ -133,6 +133,7 @@ stroke_recipe_over_sampling_2 <- recipe(stroke ~ ., data = stroke_train) %>%
   step_normalize(all_predictors())
 ```
 We build the three recipes based on the EDA and then we tune the recipes to train the six models. 
+
 1.  Elastic Net
     - parameters `mixture` and `penalty` are tuned
     
@@ -171,6 +172,7 @@ load("mars_tune_upsample_recipe1.rda")
 ```
 
 After tuning and training the models, we can find the most optimal model.
+
 ## Original Recipe 
 
 ```{r result-tibble-orig}
@@ -278,7 +280,7 @@ tune_performance_diff_recipe %>%
               background = "blue") %>% 
   kableExtra::footnote(general = "Best Performance across Different Models and Different Recipes")
 ```
-From the table, it can be seen that the elastic net and boosted tree models using original recipe have better performance than ones using upsampling recipe. However, the difference between the mean ROC-AUC score of different recipes of the Elastic Net model is only 0.0010114, much smaller than its standard error 0.0065819. Therefore, we want to include the 0.5 upsampling ratio recipe to our discussion to make a comparison between these three recipe altogether.
+From the table, it can be seen that the elastic net and boosted tree models using original recipe have better performance than ones using upsampling recipe. However, the difference between the mean ROC-AUC score of different recipes of the Elastic Net model is only 0.0010114, much smaller than its standard error 0.0065819. Therefore, we want to include the 0.5 upsampling ratio recipe to our discussion to make a comparison between these three recipe altogether. Therefore, the third major finding is that original recipe tends to perform better than upsampling recipe in our elastic net and boosted tree models. It might be when we over-sampling the sample whose stroke outcome is 1, these intentionally replication provides somewhat misleading input to model and leads to worse performance. 
 
 ```{r}
 # load results
@@ -327,10 +329,53 @@ tune_performance_diff_recipe %>%
 
 Based on the table above, the models with original recipe perform the best and different upsampling ratios have different performances based on models. Even though the tuning result with the oversampling step is not as good as the result without the oversampling step, the difference is very small. For the Elastic Net model the difference of the model with the 0.2 ratio upsampling recipe and the 0.5 ratio upsampling recipe compared with the original recipe is 0.0010114 and 0.003307, respectively. Both numbers are smaller than 0.0065819, the standard error of the result of the Elastic Net model with the original recipe. Similarly, in Boosted Tree model, there is no significant decline in performance when the upsampling step is applied. Also, the ROC-AUC score of the model with the upsampling recipe with over_ratio set to 0.5 (0.8337745) is actually higher than the ROC-AUC score of the model with the upsampling recipe with over_ratio set to 0.2 (0.8330923). 
 
-As a result, we can conclude that there is no sufficient statistical evidence that applying over-sampling or setting  over_ratio to a higher number will have strong negative impacts on the model performance. 
+As a result, the fourth major finding we can conclude is that there is no sufficient statistical evidence that applying over-sampling or setting over_ratio to a higher number will have strong negative impacts on the model performance. 
 
+## Choose the best model and fit 
+Based on our previous result, the best model is the Elastic Net model with original recipe.
 
+```{r}
+# elastic net model
+show_best(en_tuned, metric = "roc_auc") %>% 
+  select(-.config) %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  row_spec(1, color = "white",
+              background = "blue") %>% 
+  kableExtra::footnote(general = "Tuning Result for Elastic Net Model")
+```
 
+By using ROC_AUC as the parameter to choose which tuning parameter values give the best performance, the table shows that elastic net model with 0.0031623 penalty and 1.00 mixture gives the best performance.
+
+We then use the best model to fit entire training set and testing set. Similarly, we use ROC_AUC and accuracy metrics to check our performance. 
+
+```{r fit-training-set}
+en_workflow_tuned <- en_workflow %>% 
+  finalize_workflow(select_best(en_tuned, metric = "roc_auc"))
+
+en_results <- fit(en_workflow_tuned, stroke_train)
+```
+
+```{r fit-test-set}
+# create metric set
+stroke_metrics <- yardstick::metric_set(yardstick::roc_auc, 
+                                       yardstick::accuracy)
+
+# show result of prediction on testing data
+predict(en_results, new_data = stroke_test) %>% 
+  bind_cols(stroke_test %>% select(stroke)) %>% 
+  bind_cols(predict(en_results, 
+                    new_data = stroke_test, type = "prob")) %>%
+  stroke_metrics(truth = stroke, 
+                 estimate = .pred_class, .pred_Yes) %>% 
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+Based on the table above, the accuracy achieve 0.9510763 which is very high. However, due to the severe class imbalance in the outcome variable `stroke`, using accuracy as the judging performance metric might be misleading. In addition, ROC_AUC of the model is 0.8508733. The ROC_AUC metric provides an insight into the model’s capability at distinguishing between classes, and it is indifferent to the class imbalance. Compared with the ROC_AUC from the tuning model (0.8386933), the ROC_AUC of test model is slightly higher. This result suggests that the model performs pretty well on the new data. The fifth major finding is that when we apply our best elastic net model with original recipe to the testing dataset, the result performs better and implies that our classification model building is successful.
+
+## Conclusion
+In conclusion, in the executive summary, we summarize 5 major findings, including 2 findings from EDA of the dataset, 2 findings from comparing between original recipes and over-sampling recipes, and 1 last finding from fitting the best model to the testing dataset. 
 
 
 
